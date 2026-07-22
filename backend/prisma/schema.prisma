@@ -1,6 +1,8 @@
 // Sprint 1: authentication, sessions, and role-based access control.
 // Sprint 2: cooperatives, branches, committees, and per-cooperative membership.
 // Sprint 3: member KYC, onboarding/approval, guarantors, beneficiaries, audit log.
+// Regulatory compliance: a platform-wide REGULATOR role with cross-cooperative
+// oversight, and a compliance-filing submit/review workflow.
 
 generator client {
   provider = "prisma-client-js"
@@ -13,6 +15,7 @@ datasource db {
 
 enum Role {
   SUPER_ADMIN
+  REGULATOR
   COOPERATIVE_ADMIN
   CHAIRMAN
   SECRETARY
@@ -50,6 +53,8 @@ model User {
   cooperativeMemberships CooperativeMembership[]
   committeeMemberships   CommitteeMember[]
   guarantorFor           Guarantor[]
+  filingsSubmitted       ComplianceFiling[] @relation("FilingSubmitter")
+  filingsReviewed        ComplianceFiling[] @relation("FilingReviewer")
 }
 
 model RefreshToken {
@@ -100,10 +105,11 @@ model Cooperative {
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 
-  branches    Branch[]
-  committees  Committee[]
-  memberships CooperativeMembership[]
-  auditLogs   AuditLog[]
+  branches          Branch[]
+  committees        Committee[]
+  memberships       CooperativeMembership[]
+  auditLogs         AuditLog[]
+  complianceFilings ComplianceFiling[]
 }
 
 model Branch {
@@ -211,4 +217,41 @@ model AuditLog {
   createdAt     DateTime     @default(now())
 
   @@index([cooperativeId])
+}
+
+enum ComplianceFilingType {
+  ANNUAL_RETURN
+  FINANCIAL_STATEMENT
+  AGM_MINUTES
+  OTHER
+}
+
+enum ComplianceFilingStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model ComplianceFiling {
+  id                String                 @id @default(cuid())
+  cooperativeId     String
+  cooperative       Cooperative            @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  submittedByUserId String
+  submittedBy       User                   @relation("FilingSubmitter", fields: [submittedByUserId], references: [id])
+  type              ComplianceFilingType
+  period            String
+  title             String
+  notes             String?
+  documentUrl       String?
+  status            ComplianceFilingStatus @default(SUBMITTED)
+  reviewedByUserId  String?
+  reviewedBy        User?                  @relation("FilingReviewer", fields: [reviewedByUserId], references: [id])
+  reviewedAt        DateTime?
+  reviewNotes       String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  @@index([cooperativeId])
+  @@index([status])
 }

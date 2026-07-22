@@ -10,6 +10,7 @@ See [`docs/PRD.md`](docs/PRD.md), [`docs/SDD.md`](docs/SDD.md), [`docs/ROADMAP.m
 - **Sprint 1 (Authentication & RBAC):** done. Registration, login, JWT access/refresh tokens with rotation, password reset, TOTP-based MFA, and role-based access control, with a matching Next.js UI (login, register, dashboard, MFA management, forgot/reset password).
 - **Sprint 2 (Cooperative Management):** done. Cooperative creation (creator becomes `COOPERATIVE_ADMIN`), branches, committees with membership, per-cooperative membership with roles/status/category, by-laws and financial-year settings, and cooperative-scoped RBAC, with a matching Next.js UI (cooperative list/create/detail pages).
 - **Sprint 3 (Member Management):** done. Self-service membership applications with admin approval/rejection (auto-assigning a membership number), KYC profile fields (DOB, gender, phone, address, BVN, NIN), guarantor nomination with guarantor-side confirmation, beneficiaries, a digital membership card with a QR code, and an audit log of membership lifecycle events — with a matching Next.js UI (profile page, join-by-invite-link flow, pending-applications approval, member detail page with card/guarantors/beneficiaries, audit log view).
+- **Regulatory compliance (out-of-sequence addition):** done. A platform-wide `REGULATOR` role with read-only, cross-cooperative oversight (no membership required), plus a compliance-filing workflow — cooperatives submit filings (annual return, financial statement, AGM minutes, etc.), regulators review and approve/reject them. Includes a `SUPER_ADMIN`-only endpoint to promote a user's platform role (needed to bootstrap the first regulator) and a matching Next.js UI (regulator dashboard, admin user-role management, compliance-filings section on the cooperative page).
 
 See the Playbook for the remaining sprint sequence, starting with Sprint 4 (Savings Engine).
 
@@ -106,6 +107,20 @@ Cooperative-scoped RBAC is enforced by `@CooperativeRoles(...)` + `CooperativeRo
 | `POST\|GET\|PATCH\|DELETE /cooperatives/:id/members/:userId/beneficiaries` | Beneficiary CRUD (self or governance) |
 | `GET /cooperatives/:id/audit-logs` | Membership lifecycle audit trail (`COOPERATIVE_ADMIN`/`CHAIRMAN`/`AUDITOR`) |
 | `GET\|PATCH /users/me` | View/update the caller's own KYC profile (DOB, gender, phone, address, BVN, NIN) |
+
+## Regulatory Compliance API
+
+| Endpoint | Description |
+| --- | --- |
+| `GET /users` \| `PATCH /users/:id/role` | `SUPER_ADMIN`-only: list platform users and change a user's platform role |
+| `POST /cooperatives/:id/compliance-filings` | Submit a filing (`COOPERATIVE_ADMIN`/`CHAIRMAN`) |
+| `GET /cooperatives/:id/compliance-filings` | List a cooperative's own filings (any active member) |
+| `GET /compliance/cooperatives` | Cross-tenant list of all cooperatives (`REGULATOR`/`SUPER_ADMIN`) |
+| `GET /compliance/filings` | Cross-tenant list of all filings, optional `?status=` filter (`REGULATOR`/`SUPER_ADMIN`) |
+| `GET /compliance/filings/:id` | Filing detail |
+| `PATCH /compliance/filings/:id/review` | Approve/reject a filing (can't re-review one already decided) |
+
+**Bootstrapping:** there's no admin yet to grant the first `SUPER_ADMIN`, so it must be set directly in the database (`UPDATE "User" SET role = 'SUPER_ADMIN' WHERE email = '...'`). From then on, use `PATCH /users/:id/role` (or the "Manage user roles" page) to promote further admins or regulators. Role changes are embedded in the JWT at login, so a promoted user must log in again before the new role takes effect.
 
 ## CI
 

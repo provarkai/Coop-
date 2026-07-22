@@ -26,6 +26,7 @@ import { AddGuarantorDto } from './dto/add-guarantor.dto';
 import { RespondGuarantorDto } from './dto/respond-guarantor.dto';
 import { CreateBeneficiaryDto } from './dto/create-beneficiary.dto';
 import { UpdateBeneficiaryDto } from './dto/update-beneficiary.dto';
+import { CreateComplianceFilingDto } from './dto/create-compliance-filing.dto';
 import { CooperativeRoles } from './decorators/cooperative-roles.decorator';
 import { CooperativeRolesGuard } from './guards/cooperative-roles.guard';
 import {
@@ -315,5 +316,23 @@ export class CooperativesController {
   @Get(':id/audit-logs')
   listAuditLogs(@Param('id') id: string) {
     return this.cooperatives.listAuditLogs(id);
+  }
+
+  @CooperativeRoles(...MANAGE_COOPERATIVE)
+  @Post(':id/compliance-filings')
+  createComplianceFiling(
+    @Param('id') id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: CreateComplianceFilingDto,
+  ) {
+    return this.cooperatives.createComplianceFiling(id, actor, dto);
+  }
+
+  @Get(':id/compliance-filings')
+  listComplianceFilings(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.cooperatives.listComplianceFilings(id, user);
   }
 }

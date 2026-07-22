@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { CooperativesModule } from './cooperatives/cooperatives.module';
+import { ComplianceModule } from './compliance/compliance.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { CooperativesModule } from './cooperatives/cooperatives.module';
     UsersModule,
     AuthModule,
     CooperativesModule,
+    ComplianceModule,
   ],
   controllers: [AppController],
   providers: [

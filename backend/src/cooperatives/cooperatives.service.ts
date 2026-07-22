@@ -30,6 +30,7 @@ import { AddGuarantorDto } from './dto/add-guarantor.dto';
 import { RespondGuarantorDto } from './dto/respond-guarantor.dto';
 import { CreateBeneficiaryDto } from './dto/create-beneficiary.dto';
 import { UpdateBeneficiaryDto } from './dto/update-beneficiary.dto';
+import { CreateComplianceFilingDto } from './dto/create-compliance-filing.dto';
 import { MANAGE_GOVERNANCE_ROLES } from './roles.constants';
 
 @Injectable()
@@ -676,6 +677,37 @@ export class CooperativesService {
     return this.auditLog.listForCooperative(cooperativeId);
   }
 
+  async createComplianceFiling(
+    cooperativeId: string,
+    actor: AuthenticatedUser,
+    dto: CreateComplianceFilingDto,
+  ) {
+    await this.getCooperativeOrThrow(cooperativeId);
+
+    const filing = await this.prisma.complianceFiling.create({
+      data: { ...dto, cooperativeId, submittedByUserId: actor.userId },
+    });
+
+    await this.auditLog.record({
+      cooperativeId,
+      actorUserId: actor.userId,
+      action: 'compliance.filing_submitted',
+      targetType: 'ComplianceFiling',
+      targetId: filing.id,
+      metadata: { type: filing.type, period: filing.period },
+    });
+
+    return filing;
+  }
+
+  async listComplianceFilings(cooperativeId: string, user: AuthenticatedUser) {
+    await this.assertMember(cooperativeId, user);
+    return this.prisma.complianceFiling.findMany({
+      where: { cooperativeId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   private async getPendingMembershipOrThrow(
     cooperativeId: string,
     userId: string,
@@ -806,7 +838,7 @@ export class CooperativesService {
   }
 
   private async assertMember(cooperativeId: string, user: AuthenticatedUser) {
-    if (user.role === Role.SUPER_ADMIN) {
+    if (user.role === Role.SUPER_ADMIN || user.role === Role.REGULATOR) {
       return;
     }
     await this.assertActiveMembership(

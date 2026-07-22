@@ -10,9 +10,12 @@ import {
   type AuditLogEntry,
   type Branch,
   type Committee,
+  type ComplianceFiling,
   type Cooperative,
   type CooperativeMembership,
 } from "@/lib/api";
+
+const FILING_TYPES = ["ANNUAL_RETURN", "FINANCIAL_STATEMENT", "AGM_MINUTES", "OTHER"];
 
 const COOPERATIVE_ROLES = [
   "MEMBER",
@@ -59,6 +62,12 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
   const [memberRole, setMemberRole] = useState("MEMBER");
   const [memberError, setMemberError] = useState<string | null>(null);
 
+  const [filings, setFilings] = useState<ComplianceFiling[]>([]);
+  const [filingType, setFilingType] = useState("ANNUAL_RETURN");
+  const [filingPeriod, setFilingPeriod] = useState("");
+  const [filingTitle, setFilingTitle] = useState("");
+  const [filingError, setFilingError] = useState<string | null>(null);
+
   async function reload() {
     const [coop, branchList, committeeList, memberList] = await Promise.all([
       api.getCooperative(id),
@@ -72,6 +81,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
     setBranches(branchList);
     setCommittees(committeeList);
     setMembers(memberList);
+    setFilings(await api.listComplianceFilingsForCooperative(id));
 
     // Audit logs are governance/auditor-only; a 403 here just means this
     // viewer isn't one, so the section stays hidden rather than erroring.
@@ -214,6 +224,19 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
       setMembers(await api.listMembers(id));
     } catch (err) {
       setMemberError(err instanceof ApiError ? err.message : "Something went wrong");
+    }
+  }
+
+  async function onSubmitFiling(e: FormEvent) {
+    e.preventDefault();
+    setFilingError(null);
+    try {
+      await api.createComplianceFiling(id, { type: filingType, period: filingPeriod, title: filingTitle });
+      setFilingPeriod("");
+      setFilingTitle("");
+      setFilings(await api.listComplianceFilingsForCooperative(id));
+    } catch (err) {
+      setFilingError(err instanceof ApiError ? err.message : "Something went wrong");
     }
   }
 
@@ -473,6 +496,69 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
             className="rounded-full border border-black/[.08] px-4 py-1.5 text-sm font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
           >
             Add
+          </button>
+        </form>
+      </section>
+
+      <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+        <h2 className="font-semibold text-black dark:text-zinc-50">Compliance filings</h2>
+        <ErrorText message={filingError} />
+        <ul className="space-y-1 text-sm">
+          {filings.map((f) => (
+            <li key={f.id} className="flex items-center justify-between">
+              <span>
+                {f.title} <span className="text-xs text-zinc-500">({f.type} · {f.period})</span>
+              </span>
+              <span
+                className={
+                  f.status === "APPROVED"
+                    ? "text-xs text-green-600 dark:text-green-400"
+                    : f.status === "REJECTED"
+                      ? "text-xs text-red-600 dark:text-red-400"
+                      : "text-xs text-zinc-500"
+                }
+              >
+                {f.status}
+              </span>
+            </li>
+          ))}
+          {filings.length === 0 && (
+            <li className="text-zinc-500 dark:text-zinc-500">No filings submitted yet.</li>
+          )}
+        </ul>
+        <form onSubmit={onSubmitFiling} className="space-y-2">
+          <div className="flex gap-2">
+            <select
+              className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+              value={filingType}
+              onChange={(e) => setFilingType(e.target.value)}
+            >
+              {FILING_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <input
+              className="w-24 rounded-md border border-black/[.08] bg-transparent px-3 py-1.5 text-sm dark:border-white/[.145]"
+              placeholder="Period"
+              value={filingPeriod}
+              onChange={(e) => setFilingPeriod(e.target.value)}
+              required
+            />
+            <input
+              className="flex-1 rounded-md border border-black/[.08] bg-transparent px-3 py-1.5 text-sm dark:border-white/[.145]"
+              placeholder="Title"
+              value={filingTitle}
+              onChange={(e) => setFilingTitle(e.target.value)}
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            className="rounded-full border border-black/[.08] px-4 py-1.5 text-sm font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+          >
+            Submit filing
           </button>
         </form>
       </section>

@@ -126,6 +126,38 @@ export interface UserProfile {
   createdAt: string;
 }
 
+export interface PlatformUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  createdAt: string;
+}
+
+export interface ComplianceFiling {
+  id: string;
+  cooperativeId: string;
+  submittedByUserId: string;
+  type: string;
+  period: string;
+  title: string;
+  notes: string | null;
+  documentUrl: string | null;
+  status: string;
+  reviewedByUserId: string | null;
+  reviewedAt: string | null;
+  reviewNotes: string | null;
+  createdAt: string;
+  cooperative?: { id: string; name: string; slug: string };
+  submittedBy?: { id: string; email: string; firstName: string; lastName: string };
+  reviewedBy?: { id: string; email: string; firstName: string; lastName: string } | null;
+}
+
+export interface ComplianceCooperative extends Cooperative {
+  _count: { memberships: number; complianceFilings: number };
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -375,4 +407,39 @@ export const api = {
       dateOfBirth?: string;
     },
   ) => request<UserProfile>("/users/me", { method: "PATCH", body: JSON.stringify(data) }, true),
+
+  listUsers: () => request<PlatformUser[]>("/users", { method: "GET" }, true),
+
+  updateUserRole: (userId: string, role: string) =>
+    request<PlatformUser>(`/users/${userId}/role`, { method: "PATCH", body: JSON.stringify({ role }) }, true),
+
+  createComplianceFiling: (
+    cooperativeId: string,
+    data: { type: string; period: string; title: string; notes?: string; documentUrl?: string },
+  ) =>
+    request<ComplianceFiling>(
+      `/cooperatives/${cooperativeId}/compliance-filings`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  listComplianceFilingsForCooperative: (cooperativeId: string) =>
+    request<ComplianceFiling[]>(`/cooperatives/${cooperativeId}/compliance-filings`, { method: "GET" }, true),
+
+  listAllCooperativesForCompliance: () =>
+    request<ComplianceCooperative[]>("/compliance/cooperatives", { method: "GET" }, true),
+
+  listAllFilings: (status?: string) =>
+    request<ComplianceFiling[]>(
+      `/compliance/filings${status ? `?status=${status}` : ""}`,
+      { method: "GET" },
+      true,
+    ),
+
+  reviewFiling: (filingId: string, status: "APPROVED" | "REJECTED", reviewNotes?: string) =>
+    request<ComplianceFiling>(
+      `/compliance/filings/${filingId}/review`,
+      { method: "PATCH", body: JSON.stringify({ status, reviewNotes }) },
+      true,
+    ),
 };

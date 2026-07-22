@@ -40,6 +40,24 @@ export class UsersService {
     return this.prisma.user.update({ where: { id }, data });
   }
 
+  listAll() {
+    return this.prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  updateRole(id: string, role: Role) {
+    return this.prisma.user.update({ where: { id }, data: { role } });
+  }
+
   toPublicProfile(user: {
     id: string;
     email: string;

@@ -64,6 +64,22 @@ export default function DashboardPage() {
           >
             Manage two-factor authentication
           </Link>
+          {(user.role === "REGULATOR" || user.role === "SUPER_ADMIN") && (
+            <Link
+              href="/regulator"
+              className="w-full rounded-full border border-black/[.08] px-5 py-2 text-center text-sm font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+            >
+              Regulator dashboard
+            </Link>
+          )}
+          {user.role === "SUPER_ADMIN" && (
+            <Link
+              href="/admin/users"
+              className="w-full rounded-full border border-black/[.08] px-5 py-2 text-center text-sm font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+            >
+              Manage user roles
+            </Link>
+          )}
           <button
             onClick={onLogout}
             className="w-full rounded-full bg-foreground px-5 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
