@@ -25,3 +25,15 @@ export const VIEW_SAVINGS_ROLES = [
   Role.TREASURER,
   Role.AUDITOR,
 ] as const;
+export const MANAGE_LOAN_ROLES = [
+  Role.COOPERATIVE_ADMIN,
+  Role.CHAIRMAN,
+  Role.LOAN_OFFICER,
+] as const;
+export const VIEW_LOAN_ROLES = [
+  Role.COOPERATIVE_ADMIN,
+  Role.CHAIRMAN,
+  Role.LOAN_OFFICER,
+  Role.TREASURER,
+  Role.AUDITOR,
+] as const;

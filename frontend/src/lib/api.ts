@@ -204,6 +204,67 @@ export interface SavingsReceipt {
   qrCodeDataUrl: string;
 }
 
+export interface LoanProduct {
+  id: string;
+  cooperativeId: string;
+  name: string;
+  code: string;
+  interestRatePercent: string;
+  maxAmount: string;
+  maxTermMonths: number;
+  penaltyRatePercent: string;
+  requiredGuarantors: number;
+  isActive: boolean;
+}
+
+export interface RepaymentInstallment {
+  id: string;
+  installmentNumber: number;
+  dueDate: string;
+  principalDue: string;
+  interestDue: string;
+  amountPaid: string;
+  status: "PENDING" | "PARTIAL" | "PAID" | "OVERDUE";
+  paidAt: string | null;
+}
+
+export interface LoanLedgerEntry {
+  id: string;
+  type: "DISBURSEMENT" | "REPAYMENT" | "PENALTY";
+  amount: string;
+  balanceAfter: string;
+  narration: string | null;
+  createdAt: string;
+}
+
+export interface LoanGuarantor {
+  id: string;
+  loanId: string;
+  guarantorUserId: string;
+  status: string;
+  guarantorUser?: { id: string; email: string; firstName: string; lastName: string };
+  loan?: Loan;
+}
+
+export interface Loan {
+  id: string;
+  cooperativeId: string;
+  membershipId: string;
+  productId: string;
+  principal: string;
+  interestRatePercent: string;
+  termMonths: number;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "ACTIVE" | "COMPLETED" | "DEFAULTED";
+  outstandingBalance: string;
+  rejectionReason: string | null;
+  createdAt: string;
+  product?: LoanProduct;
+  membership?: { user: { id: string; email: string; firstName: string; lastName: string } };
+  guarantors?: LoanGuarantor[];
+  schedule?: RepaymentInstallment[];
+  ledger?: LoanLedgerEntry[];
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -561,4 +622,104 @@ export const api = {
       { method: "GET" },
       true,
     ),
+
+  listLoanProducts: (cooperativeId: string) =>
+    request<LoanProduct[]>(`/cooperatives/${cooperativeId}/loan-products`, { method: "GET" }, true),
+
+  createLoanProduct: (
+    cooperativeId: string,
+    data: {
+      name: string;
+      code: string;
+      interestRatePercent?: number;
+      maxAmount: number;
+      maxTermMonths: number;
+      penaltyRatePercent?: number;
+      requiredGuarantors?: number;
+    },
+  ) =>
+    request<LoanProduct>(
+      `/cooperatives/${cooperativeId}/loan-products`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  updateLoanProduct: (
+    cooperativeId: string,
+    productId: string,
+    data: Partial<{
+      name: string;
+      interestRatePercent: number;
+      maxAmount: number;
+      maxTermMonths: number;
+      penaltyRatePercent: number;
+      requiredGuarantors: number;
+      isActive: boolean;
+    }>,
+  ) =>
+    request<LoanProduct>(
+      `/cooperatives/${cooperativeId}/loan-products/${productId}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      true,
+    ),
+
+  applyForLoan: (cooperativeId: string, data: { productId: string; principal: number; termMonths: number }) =>
+    request<Loan>(`/cooperatives/${cooperativeId}/loans`, { method: "POST", body: JSON.stringify(data) }, true),
+
+  listLoansForCooperative: (cooperativeId: string) =>
+    request<Loan[]>(`/cooperatives/${cooperativeId}/loans`, { method: "GET" }, true),
+
+  listLoansForMember: (cooperativeId: string, userId: string) =>
+    request<Loan[]>(`/cooperatives/${cooperativeId}/members/${userId}/loans`, { method: "GET" }, true),
+
+  getLoan: (cooperativeId: string, loanId: string) =>
+    request<Loan>(`/cooperatives/${cooperativeId}/loans/${loanId}`, { method: "GET" }, true),
+
+  addLoanGuarantor: (cooperativeId: string, loanId: string, data: { email: string }) =>
+    request<LoanGuarantor>(
+      `/cooperatives/${cooperativeId}/loans/${loanId}/guarantors`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  listLoanGuarantors: (cooperativeId: string, loanId: string) =>
+    request<LoanGuarantor[]>(`/cooperatives/${cooperativeId}/loans/${loanId}/guarantors`, { method: "GET" }, true),
+
+  listGuarantorRequestsForUser: (cooperativeId: string) =>
+    request<LoanGuarantor[]>(`/cooperatives/${cooperativeId}/loan-guarantor-requests`, { method: "GET" }, true),
+
+  respondToLoanGuarantorRequest: (
+    cooperativeId: string,
+    loanId: string,
+    guarantorId: string,
+    status: "APPROVED" | "DECLINED",
+  ) =>
+    request<LoanGuarantor>(
+      `/cooperatives/${cooperativeId}/loans/${loanId}/guarantors/${guarantorId}/respond`,
+      { method: "PATCH", body: JSON.stringify({ status }) },
+      true,
+    ),
+
+  approveLoan: (cooperativeId: string, loanId: string) =>
+    request<Loan>(`/cooperatives/${cooperativeId}/loans/${loanId}/approve`, { method: "POST" }, true),
+
+  rejectLoan: (cooperativeId: string, loanId: string, reason?: string) =>
+    request<Loan>(
+      `/cooperatives/${cooperativeId}/loans/${loanId}/reject`,
+      { method: "POST", body: JSON.stringify({ reason }) },
+      true,
+    ),
+
+  disburseLoan: (cooperativeId: string, loanId: string) =>
+    request<Loan>(`/cooperatives/${cooperativeId}/loans/${loanId}/disburse`, { method: "POST" }, true),
+
+  recordLoanRepayment: (cooperativeId: string, loanId: string, data: { amount: number; narration?: string }) =>
+    request<LoanLedgerEntry>(
+      `/cooperatives/${cooperativeId}/loans/${loanId}/repayments`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  assessLoanPenalty: (cooperativeId: string, loanId: string) =>
+    request<LoanLedgerEntry>(`/cooperatives/${cooperativeId}/loans/${loanId}/assess-penalty`, { method: "POST" }, true),
 };

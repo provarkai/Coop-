@@ -11,6 +11,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { CooperativesModule } from './cooperatives/cooperatives.module';
 import { ComplianceModule } from './compliance/compliance.module';
 import { SavingsModule } from './savings/savings.module';
+import { LoansModule } from './loans/loans.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { SavingsModule } from './savings/savings.module';
     CooperativesModule,
     ComplianceModule,
     SavingsModule,
+    LoansModule,
   ],
   controllers: [AppController],
   providers: [

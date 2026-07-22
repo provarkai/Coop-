@@ -12,8 +12,9 @@ See [`docs/PRD.md`](docs/PRD.md), [`docs/SDD.md`](docs/SDD.md), [`docs/ROADMAP.m
 - **Sprint 3 (Member Management):** done. Self-service membership applications with admin approval/rejection (auto-assigning a membership number), KYC profile fields (DOB, gender, phone, address, BVN, NIN), guarantor nomination with guarantor-side confirmation, beneficiaries, a digital membership card with a QR code, and an audit log of membership lifecycle events — with a matching Next.js UI (profile page, join-by-invite-link flow, pending-applications approval, member detail page with card/guarantors/beneficiaries, audit log view).
 - **Regulatory compliance (out-of-sequence addition):** done. A platform-wide `REGULATOR` role with read-only, cross-cooperative oversight (no membership required), plus a compliance-filing workflow — cooperatives submit filings (annual return, financial statement, AGM minutes, etc.), regulators review and approve/reject them. Includes a `SUPER_ADMIN`-only endpoint to promote a user's platform role (needed to bootstrap the first regulator) and a matching Next.js UI (regulator dashboard, admin user-role management, compliance-filings section on the cooperative page).
 - **Sprint 4 (Savings Engine):** done. Configurable savings products (interest rate, minimum balance), per-member savings accounts opened by governance/treasurer, deposit/withdrawal recording with minimum-balance enforcement, simple-interest accrual, account statements, and a QR-coded transaction receipt — with a matching Next.js UI (savings products, a self-service "My savings" view, and a governance-facing savings-accounts ledger on the cooperative page).
+- **Sprint 5 (Loan Management):** done. Configurable loan products (rate, max amount/term, penalty rate, required guarantor count); self-service loan applications; per-loan guarantor nomination and guarantor sign-off (with a dedicated endpoint so a nominated guarantor can discover and act on their own pending requests); governance approval (gated on enough approved guarantors) and rejection; disbursement that generates an equal-installment repayment schedule; repayment recording that allocates oldest-installment-first and completes the loan once paid off; and late-payment penalty assessment on overdue installments — with a matching Next.js UI (loan products, a self-service "My loans" + application form, a "Guarantor requests" inbox, and a governance-facing loan ledger with approve/reject/disburse/repay/penalize actions and schedule/ledger drill-down).
 
-See the Playbook for the remaining sprint sequence, starting with Sprint 5 (Loan Management).
+See the Playbook for the remaining sprint sequence, starting with Sprint 6 (Payments).
 
 ## Structure
 
@@ -134,6 +135,25 @@ Cooperative-scoped RBAC is enforced by `@CooperativeRoles(...)` + `CooperativeRo
 | `POST\|GET /cooperatives/:id/savings/accounts/:accountId/transactions` | Record a deposit/withdrawal (governance/treasurer; withdrawals can't breach the product minimum balance) or list the account statement (self or governance/treasurer/auditor) |
 | `POST /cooperatives/:id/savings/accounts/:accountId/accrue-interest` | Post simple interest since the last accrual (governance/treasurer) |
 | `GET /cooperatives/:id/savings/accounts/:accountId/transactions/:transactionId/receipt` | QR-coded transaction receipt (self or governance/treasurer/auditor) |
+
+## Loans API
+
+| Endpoint | Description |
+| --- | --- |
+| `POST\|GET /cooperatives/:id/loan-products` | Create/list loan products (create is `COOPERATIVE_ADMIN`/`CHAIRMAN`/`LOAN_OFFICER`; list is any active member) |
+| `PATCH /cooperatives/:id/loan-products/:productId` | Update a product's rate, max amount/term, penalty rate, required guarantors, or active flag |
+| `POST /cooperatives/:id/loans` | Apply for a loan (self-service; validated against the product's max amount/term) |
+| `GET /cooperatives/:id/loans` | Cooperative-wide loan ledger (`COOPERATIVE_ADMIN`/`CHAIRMAN`/`LOAN_OFFICER`/`TREASURER`/`AUDITOR`) |
+| `GET /cooperatives/:id/members/:userId/loans` | A member's own loans (self or governance/loan officer/treasurer/auditor) |
+| `GET /cooperatives/:id/loans/:loanId` | Loan detail with guarantors, repayment schedule, and ledger (self, a nominated guarantor, or governance/loan officer/treasurer/auditor) |
+| `POST\|GET /cooperatives/:id/loans/:loanId/guarantors` | Nominate (borrower only, while `PENDING`) or list a loan's guarantors |
+| `GET /cooperatives/:id/loan-guarantor-requests` | The caller's own pending/decided guarantor requests across the cooperative |
+| `PATCH /cooperatives/:id/loans/:loanId/guarantors/:guarantorId/respond` | Only the nominated guarantor can approve/decline |
+| `POST /cooperatives/:id/loans/:loanId/approve` | Approve a `PENDING` loan (requires enough `APPROVED` guarantors) |
+| `POST /cooperatives/:id/loans/:loanId/reject` | Reject a `PENDING` loan |
+| `POST /cooperatives/:id/loans/:loanId/disburse` | Disburse an `APPROVED` loan; generates an equal-installment repayment schedule |
+| `POST /cooperatives/:id/loans/:loanId/repayments` | Record a repayment; allocates oldest-installment-first and completes the loan once paid off |
+| `POST /cooperatives/:id/loans/:loanId/assess-penalty` | Charge a penalty on newly overdue installments |
 
 ## CI
 

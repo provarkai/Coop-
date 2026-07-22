@@ -19,6 +19,7 @@ import {
   type SavingsReceipt,
   type SavingsTransaction,
 } from "@/lib/api";
+import LoansSection from "./LoansSection";
 
 const FILING_TYPES = ["ANNUAL_RETURN", "FINANCIAL_STATEMENT", "AGM_MINUTES", "OTHER"];
 
@@ -867,6 +868,8 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
           )}
         </section>
       )}
+
+      <LoansSection cooperativeId={id} me={me} />
 
       <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
         <h2 className="font-semibold text-black dark:text-zinc-50">Compliance filings</h2>

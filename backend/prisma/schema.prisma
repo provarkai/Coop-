@@ -5,6 +5,9 @@
 // oversight, and a compliance-filing submit/review workflow.
 // Sprint 4: savings products, member savings accounts, contributions/
 // withdrawals, and simple-interest accrual.
+// Sprint 5: loan products, applications, guarantor sign-off, approval,
+// disbursement with a generated repayment schedule, repayments, and
+// late-payment penalty assessment.
 
 generator client {
   provider = "prisma-client-js"
@@ -58,6 +61,8 @@ model User {
   filingsSubmitted            ComplianceFiling[]      @relation("FilingSubmitter")
   filingsReviewed             ComplianceFiling[]      @relation("FilingReviewer")
   savingsTransactionsRecorded SavingsTransaction[]
+  loanGuarantorFor            LoanGuarantor[]
+  loanLedgerEntriesRecorded   LoanLedgerEntry[]
 }
 
 model RefreshToken {
@@ -115,6 +120,8 @@ model Cooperative {
   complianceFilings ComplianceFiling[]
   savingsProducts   SavingsProduct[]
   savingsAccounts   SavingsAccount[]
+  loanProducts      LoanProduct[]
+  loans             Loan[]
 }
 
 model Branch {
@@ -175,6 +182,7 @@ model CooperativeMembership {
   guarantors      Guarantor[]
   beneficiaries   Beneficiary[]
   savingsAccounts SavingsAccount[]
+  loans           Loan[]
 
   @@unique([cooperativeId, userId])
   @@unique([cooperativeId, membershipNumber])
@@ -326,4 +334,120 @@ model SavingsTransaction {
   createdAt        DateTime               @default(now())
 
   @@index([accountId])
+}
+
+enum LoanStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ACTIVE
+  COMPLETED
+  DEFAULTED
+}
+
+enum RepaymentInstallmentStatus {
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+enum LoanLedgerEntryType {
+  DISBURSEMENT
+  REPAYMENT
+  PENALTY
+}
+
+model LoanProduct {
+  id                  String      @id @default(cuid())
+  cooperativeId       String
+  cooperative         Cooperative @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  name                String
+  code                String
+  interestRatePercent Decimal     @default(0) @db.Decimal(5, 2)
+  maxAmount           Decimal     @db.Decimal(14, 2)
+  maxTermMonths       Int
+  penaltyRatePercent  Decimal     @default(0) @db.Decimal(5, 2)
+  requiredGuarantors  Int         @default(0)
+  isActive            Boolean     @default(true)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  loans Loan[]
+
+  @@unique([cooperativeId, code])
+}
+
+model Loan {
+  id                  String                @id @default(cuid())
+  cooperativeId       String
+  cooperative         Cooperative           @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  membershipId        String
+  membership          CooperativeMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  productId           String
+  product             LoanProduct           @relation(fields: [productId], references: [id])
+  principal           Decimal               @db.Decimal(14, 2)
+  interestRatePercent Decimal               @db.Decimal(5, 2)
+  termMonths          Int
+  status              LoanStatus            @default(PENDING)
+  outstandingBalance  Decimal               @default(0) @db.Decimal(14, 2)
+  rejectionReason     String?
+  approvedByUserId    String?
+  approvedAt          DateTime?
+  disbursedByUserId   String?
+  disbursedAt         DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  guarantors LoanGuarantor[]
+  schedule   RepaymentInstallment[]
+  ledger     LoanLedgerEntry[]
+
+  @@index([cooperativeId])
+  @@index([membershipId])
+}
+
+model LoanGuarantor {
+  id              String          @id @default(cuid())
+  loanId          String
+  loan            Loan            @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  guarantorUserId String
+  guarantorUser   User            @relation(fields: [guarantorUserId], references: [id], onDelete: Cascade)
+  status          GuarantorStatus @default(PENDING)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([loanId, guarantorUserId])
+}
+
+model RepaymentInstallment {
+  id                String                     @id @default(cuid())
+  loanId            String
+  loan              Loan                       @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  installmentNumber Int
+  dueDate           DateTime
+  principalDue      Decimal                    @db.Decimal(14, 2)
+  interestDue       Decimal                    @db.Decimal(14, 2)
+  amountPaid        Decimal                    @default(0) @db.Decimal(14, 2)
+  status            RepaymentInstallmentStatus @default(PENDING)
+  paidAt            DateTime?
+
+  @@unique([loanId, installmentNumber])
+  @@index([loanId])
+}
+
+model LoanLedgerEntry {
+  id               String              @id @default(cuid())
+  loanId           String
+  loan             Loan                @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  type             LoanLedgerEntryType
+  amount           Decimal             @db.Decimal(14, 2)
+  balanceAfter     Decimal             @db.Decimal(14, 2)
+  narration        String?
+  recordedByUserId String?
+  recordedBy       User?               @relation(fields: [recordedByUserId], references: [id])
+  createdAt        DateTime            @default(now())
+
+  @@index([loanId])
 }
