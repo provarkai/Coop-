@@ -100,6 +100,19 @@ describe('Cooperatives (e2e)', () => {
       .expect(403);
   });
 
+  it('lets a non-member preview only the cooperative name and slug', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/cooperatives/${cooperativeId}/preview`)
+      .set('Authorization', `Bearer ${outsiderToken}`)
+      .expect(200);
+
+    expect(res.body).toEqual({
+      id: cooperativeId,
+      name: 'Test Cooperative',
+      slug,
+    });
+  });
+
   it('only shows a user their own cooperatives', async () => {
     const res = await request(app.getHttpServer())
       .get('/cooperatives')

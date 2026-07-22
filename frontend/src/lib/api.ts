@@ -67,6 +67,65 @@ export interface CooperativeMembership {
   user: { id: string; email: string; firstName: string; lastName: string };
 }
 
+export interface CooperativePreview {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface MembershipCard {
+  membershipNumber: string | null;
+  role: string;
+  category: string;
+  joinedAt: string;
+  member: { firstName: string; lastName: string; email: string };
+  cooperative: { id: string; name: string; slug: string };
+  qrCodeDataUrl: string;
+}
+
+export interface Guarantor {
+  id: string;
+  membershipId: string;
+  guarantorUserId: string;
+  status: string;
+  guarantorUser?: { id: string; email: string; firstName: string; lastName: string };
+}
+
+export interface Beneficiary {
+  id: string;
+  membershipId: string;
+  fullName: string;
+  relationship: string;
+  phone: string | null;
+  address: string | null;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  actorUserId: string | null;
+  metadata: unknown;
+  createdAt: string;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  dateOfBirth: string | null;
+  gender: string | null;
+  phone: string | null;
+  address: string | null;
+  bvn: string | null;
+  nin: string | null;
+  mfaEnabled: boolean;
+  createdAt: string;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -233,4 +292,87 @@ export const api = {
 
   removeMembership: (cooperativeId: string, userId: string) =>
     request<void>(`/cooperatives/${cooperativeId}/members/${userId}`, { method: "DELETE" }, true),
+
+  getCooperativePreview: (id: string) =>
+    request<CooperativePreview>(`/cooperatives/${id}/preview`, { method: "GET" }, true),
+
+  applyToCooperative: (cooperativeId: string, data: { category?: string } = {}) =>
+    request<CooperativeMembership>(
+      `/cooperatives/${cooperativeId}/apply`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  approveMembership: (cooperativeId: string, userId: string) =>
+    request<CooperativeMembership>(
+      `/cooperatives/${cooperativeId}/members/${userId}/approve`,
+      { method: "POST" },
+      true,
+    ),
+
+  rejectMembership: (cooperativeId: string, userId: string) =>
+    request<CooperativeMembership>(
+      `/cooperatives/${cooperativeId}/members/${userId}/reject`,
+      { method: "POST" },
+      true,
+    ),
+
+  getMembershipCard: (cooperativeId: string, userId: string) =>
+    request<MembershipCard>(`/cooperatives/${cooperativeId}/members/${userId}/card`, { method: "GET" }, true),
+
+  listGuarantors: (cooperativeId: string, userId: string) =>
+    request<Guarantor[]>(`/cooperatives/${cooperativeId}/members/${userId}/guarantors`, { method: "GET" }, true),
+
+  addGuarantor: (cooperativeId: string, userId: string, data: { email: string }) =>
+    request<Guarantor>(
+      `/cooperatives/${cooperativeId}/members/${userId}/guarantors`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  respondToGuarantorRequest: (cooperativeId: string, guarantorId: string, status: "APPROVED" | "DECLINED") =>
+    request<Guarantor>(
+      `/cooperatives/${cooperativeId}/guarantors/${guarantorId}/respond`,
+      { method: "PATCH", body: JSON.stringify({ status }) },
+      true,
+    ),
+
+  removeGuarantor: (cooperativeId: string, userId: string, guarantorId: string) =>
+    request<void>(
+      `/cooperatives/${cooperativeId}/members/${userId}/guarantors/${guarantorId}`,
+      { method: "DELETE" },
+      true,
+    ),
+
+  listBeneficiaries: (cooperativeId: string, userId: string) =>
+    request<Beneficiary[]>(`/cooperatives/${cooperativeId}/members/${userId}/beneficiaries`, { method: "GET" }, true),
+
+  addBeneficiary: (
+    cooperativeId: string,
+    userId: string,
+    data: { fullName: string; relationship: string; phone?: string; address?: string },
+  ) =>
+    request<Beneficiary>(
+      `/cooperatives/${cooperativeId}/members/${userId}/beneficiaries`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  removeBeneficiary: (cooperativeId: string, userId: string, beneficiaryId: string) =>
+    request<void>(
+      `/cooperatives/${cooperativeId}/members/${userId}/beneficiaries/${beneficiaryId}`,
+      { method: "DELETE" },
+      true,
+    ),
+
+  listAuditLogs: (cooperativeId: string) =>
+    request<AuditLogEntry[]>(`/cooperatives/${cooperativeId}/audit-logs`, { method: "GET" }, true),
+
+  getProfile: () => request<UserProfile>("/users/me", { method: "GET" }, true),
+
+  updateProfile: (
+    data: Partial<Pick<UserProfile, "firstName" | "lastName" | "gender" | "phone" | "address" | "bvn" | "nin">> & {
+      dateOfBirth?: string;
+    },
+  ) => request<UserProfile>("/users/me", { method: "PATCH", body: JSON.stringify(data) }, true),
 };

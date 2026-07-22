@@ -5,9 +5,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MembershipStatus, Role } from '@prisma/client';
+import { ConfigService } from '@nestjs/config';
+import {
+  GuarantorStatus,
+  MembershipStatus,
+  Prisma,
+  Role,
+} from '@prisma/client';
+import * as QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+import { AuditLogService } from '../audit-log/audit-log.service';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { CreateCooperativeDto } from './dto/create-cooperative.dto';
 import { UpdateCooperativeDto } from './dto/update-cooperative.dto';
@@ -17,12 +25,20 @@ import { CreateCommitteeDto } from './dto/create-committee.dto';
 import { AddCommitteeMemberDto } from './dto/add-committee-member.dto';
 import { AddMemberDto } from './dto/add-member.dto';
 import { UpdateMembershipDto } from './dto/update-membership.dto';
+import { ApplyDto } from './dto/apply.dto';
+import { AddGuarantorDto } from './dto/add-guarantor.dto';
+import { RespondGuarantorDto } from './dto/respond-guarantor.dto';
+import { CreateBeneficiaryDto } from './dto/create-beneficiary.dto';
+import { UpdateBeneficiaryDto } from './dto/update-beneficiary.dto';
+import { MANAGE_GOVERNANCE_ROLES } from './roles.constants';
 
 @Injectable()
 export class CooperativesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
+    private readonly auditLog: AuditLogService,
+    private readonly config: ConfigService,
   ) {}
 
   async create(creator: AuthenticatedUser, dto: CreateCooperativeDto) {
@@ -68,6 +84,15 @@ export class CooperativesService {
   async findOne(cooperativeId: string, user: AuthenticatedUser) {
     await this.assertMember(cooperativeId, user);
     return this.getCooperativeOrThrow(cooperativeId);
+  }
+
+  async getPreview(cooperativeId: string) {
+    const cooperative = await this.getCooperativeOrThrow(cooperativeId);
+    return {
+      id: cooperative.id,
+      name: cooperative.name,
+      slug: cooperative.slug,
+    };
   }
 
   async update(cooperativeId: string, dto: UpdateCooperativeDto) {
@@ -199,7 +224,11 @@ export class CooperativesService {
     await this.prisma.committeeMember.delete({ where: { id: existing.id } });
   }
 
-  async addMember(cooperativeId: string, dto: AddMemberDto) {
+  async addMember(
+    cooperativeId: string,
+    actor: AuthenticatedUser,
+    dto: AddMemberDto,
+  ) {
     await this.getCooperativeOrThrow(cooperativeId);
 
     const targetUser = await this.users.findByEmail(dto.email);
@@ -216,7 +245,7 @@ export class CooperativesService {
       );
     }
 
-    return this.prisma.cooperativeMembership.create({
+    const membership = await this.prisma.cooperativeMembership.create({
       data: {
         cooperativeId,
         userId: targetUser.id,
@@ -225,6 +254,21 @@ export class CooperativesService {
         membershipNumber: dto.membershipNumber,
       },
     });
+
+    const withNumber = membership.membershipNumber
+      ? membership
+      : await this.assignMembershipNumber(cooperativeId, membership.id);
+
+    await this.auditLog.record({
+      cooperativeId,
+      actorUserId: actor.userId,
+      action: 'membership.added',
+      targetType: 'CooperativeMembership',
+      targetId: membership.id,
+      metadata: { userId: targetUser.id, role: withNumber.role },
+    });
+
+    return withNumber;
   }
 
   async listMembers(cooperativeId: string, user: AuthenticatedUser) {
@@ -243,6 +287,7 @@ export class CooperativesService {
   async updateMembership(
     cooperativeId: string,
     userId: string,
+    actor: AuthenticatedUser,
     dto: UpdateMembershipDto,
   ) {
     const membership = await this.prisma.cooperativeMembership.findUnique({
@@ -251,13 +296,28 @@ export class CooperativesService {
     if (!membership) {
       throw new NotFoundException('Membership not found');
     }
-    return this.prisma.cooperativeMembership.update({
+    const updated = await this.prisma.cooperativeMembership.update({
       where: { id: membership.id },
       data: dto,
     });
+
+    await this.auditLog.record({
+      cooperativeId,
+      actorUserId: actor.userId,
+      action: 'membership.updated',
+      targetType: 'CooperativeMembership',
+      targetId: membership.id,
+      metadata: { userId, changes: dto as Prisma.InputJsonValue },
+    });
+
+    return updated;
   }
 
-  async removeMembership(cooperativeId: string, userId: string) {
+  async removeMembership(
+    cooperativeId: string,
+    userId: string,
+    actor: AuthenticatedUser,
+  ) {
     const membership = await this.prisma.cooperativeMembership.findUnique({
       where: { cooperativeId_userId: { cooperativeId, userId } },
     });
@@ -267,6 +327,449 @@ export class CooperativesService {
     await this.prisma.cooperativeMembership.delete({
       where: { id: membership.id },
     });
+
+    await this.auditLog.record({
+      cooperativeId,
+      actorUserId: actor.userId,
+      action: 'membership.removed',
+      targetType: 'CooperativeMembership',
+      targetId: membership.id,
+      metadata: { userId },
+    });
+  }
+
+  async apply(
+    cooperativeId: string,
+    applicant: AuthenticatedUser,
+    dto: ApplyDto,
+  ) {
+    await this.getCooperativeOrThrow(cooperativeId);
+
+    const existing = await this.prisma.cooperativeMembership.findUnique({
+      where: {
+        cooperativeId_userId: { cooperativeId, userId: applicant.userId },
+      },
+    });
+    if (existing) {
+      throw new ConflictException(
+        'You already have a membership (or application) for this cooperative',
+      );
+    }
+
+    const membership = await this.prisma.cooperativeMembership.create({
+      data: {
+        cooperativeId,
+        userId: applicant.userId,
+        role: Role.MEMBER,
+        status: MembershipStatus.PENDING,
+        category: dto.category ?? 'ORDINARY',
+      },
+    });
+
+    await this.auditLog.record({
+      cooperativeId,
+      actorUserId: applicant.userId,
+      action: 'membership.applied',
+      targetType: 'CooperativeMembership',
+      targetId: membership.id,
+    });
+
+    return membership;
+  }
+
+  async approveMembership(
+    cooperativeId: string,
+    userId: string,
+    actor: AuthenticatedUser,
+  ) {
+    const membership = await this.getPendingMembershipOrThrow(
+      cooperativeId,
+      userId,
+    );
+
+    const approved = await this.prisma.cooperativeMembership.update({
+      where: { id: membership.id },
+      data: { status: MembershipStatus.ACTIVE },
+    });
+    const withNumber = approved.membershipNumber
+      ? approved
+      : await this.assignMembershipNumber(cooperativeId, approved.id);
+
+    await this.auditLog.record({
+      cooperativeId,
+      actorUserId: actor.userId,
+      action: 'membership.approved',
+      targetType: 'CooperativeMembership',
+      targetId: membership.id,
+      metadata: { userId },
+    });
+
+    return withNumber;
+  }
+
+  async rejectMembership(
+    cooperativeId: string,
+    userId: string,
+    actor: AuthenticatedUser,
+  ) {
+    const membership = await this.getPendingMembershipOrThrow(
+      cooperativeId,
+      userId,
+    );
+
+    const rejected = await this.prisma.cooperativeMembership.update({
+      where: { id: membership.id },
+      data: { status: MembershipStatus.REJECTED },
+    });
+
+    await this.auditLog.record({
+      cooperativeId,
+      actorUserId: actor.userId,
+      action: 'membership.rejected',
+      targetType: 'CooperativeMembership',
+      targetId: membership.id,
+      metadata: { userId },
+    });
+
+    return rejected;
+  }
+
+  async getMembershipCard(
+    cooperativeId: string,
+    userId: string,
+    requester: AuthenticatedUser,
+  ) {
+    await this.assertSelfOrGovernance(cooperativeId, userId, requester);
+
+    const membership = await this.prisma.cooperativeMembership.findUnique({
+      where: { cooperativeId_userId: { cooperativeId, userId } },
+      include: { user: true, cooperative: true },
+    });
+    if (!membership || membership.status !== MembershipStatus.ACTIVE) {
+      throw new NotFoundException('No active membership found');
+    }
+
+    const appUrl =
+      this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
+    const verifyUrl = `${appUrl}/verify-membership?cooperative=${cooperativeId}&member=${userId}`;
+    const qrCodeDataUrl = await QRCode.toDataURL(verifyUrl);
+
+    return {
+      membershipNumber: membership.membershipNumber,
+      role: membership.role,
+      category: membership.category,
+      joinedAt: membership.joinedAt,
+      member: {
+        firstName: membership.user.firstName,
+        lastName: membership.user.lastName,
+        email: membership.user.email,
+      },
+      cooperative: {
+        id: membership.cooperative.id,
+        name: membership.cooperative.name,
+        slug: membership.cooperative.slug,
+      },
+      qrCodeDataUrl,
+    };
+  }
+
+  async addGuarantor(
+    cooperativeId: string,
+    userId: string,
+    requester: AuthenticatedUser,
+    dto: AddGuarantorDto,
+  ) {
+    await this.assertSelfOrGovernance(cooperativeId, userId, requester);
+    const membership = await this.getActiveMembershipOrThrow(
+      cooperativeId,
+      userId,
+    );
+
+    const guarantorUser = await this.users.findByEmail(dto.email);
+    if (!guarantorUser) {
+      throw new NotFoundException('No user with that email is registered');
+    }
+    if (guarantorUser.id === userId) {
+      throw new BadRequestException('A member cannot guarantee themselves');
+    }
+    await this.assertActiveMembership(
+      cooperativeId,
+      guarantorUser.id,
+      'The proposed guarantor must be an active cooperative member',
+    );
+
+    const existing = await this.prisma.guarantor.findUnique({
+      where: {
+        membershipId_guarantorUserId: {
+          membershipId: membership.id,
+          guarantorUserId: guarantorUser.id,
+        },
+      },
+    });
+    if (existing) {
+      throw new ConflictException(
+        'This guarantor has already been nominated for this membership',
+      );
+    }
+
+    return this.prisma.guarantor.create({
+      data: { membershipId: membership.id, guarantorUserId: guarantorUser.id },
+    });
+  }
+
+  async listGuarantors(
+    cooperativeId: string,
+    userId: string,
+    requester: AuthenticatedUser,
+  ) {
+    await this.assertSelfOrGovernance(cooperativeId, userId, requester);
+    const membership = await this.getActiveMembershipOrThrow(
+      cooperativeId,
+      userId,
+    );
+
+    return this.prisma.guarantor.findMany({
+      where: { membershipId: membership.id },
+      include: {
+        guarantorUser: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async respondToGuarantorRequest(
+    cooperativeId: string,
+    guarantorId: string,
+    requester: AuthenticatedUser,
+    dto: RespondGuarantorDto,
+  ) {
+    const guarantor = await this.prisma.guarantor.findUnique({
+      where: { id: guarantorId },
+      include: { membership: true },
+    });
+    if (!guarantor || guarantor.membership.cooperativeId !== cooperativeId) {
+      throw new NotFoundException('Guarantor request not found');
+    }
+    if (guarantor.guarantorUserId !== requester.userId) {
+      throw new ForbiddenException(
+        'Only the nominated guarantor can respond to this request',
+      );
+    }
+
+    return this.prisma.guarantor.update({
+      where: { id: guarantorId },
+      data: {
+        status:
+          dto.status === 'APPROVED'
+            ? GuarantorStatus.APPROVED
+            : GuarantorStatus.DECLINED,
+      },
+    });
+  }
+
+  async removeGuarantor(
+    cooperativeId: string,
+    userId: string,
+    guarantorId: string,
+    requester: AuthenticatedUser,
+  ) {
+    await this.assertSelfOrGovernance(cooperativeId, userId, requester);
+    const membership = await this.getActiveMembershipOrThrow(
+      cooperativeId,
+      userId,
+    );
+
+    const guarantor = await this.prisma.guarantor.findUnique({
+      where: { id: guarantorId },
+    });
+    if (!guarantor || guarantor.membershipId !== membership.id) {
+      throw new NotFoundException('Guarantor not found');
+    }
+    await this.prisma.guarantor.delete({ where: { id: guarantorId } });
+  }
+
+  async addBeneficiary(
+    cooperativeId: string,
+    userId: string,
+    requester: AuthenticatedUser,
+    dto: CreateBeneficiaryDto,
+  ) {
+    await this.assertSelfOrGovernance(cooperativeId, userId, requester);
+    const membership = await this.getActiveMembershipOrThrow(
+      cooperativeId,
+      userId,
+    );
+
+    return this.prisma.beneficiary.create({
+      data: { ...dto, membershipId: membership.id },
+    });
+  }
+
+  async listBeneficiaries(
+    cooperativeId: string,
+    userId: string,
+    requester: AuthenticatedUser,
+  ) {
+    await this.assertSelfOrGovernance(cooperativeId, userId, requester);
+    const membership = await this.getActiveMembershipOrThrow(
+      cooperativeId,
+      userId,
+    );
+
+    return this.prisma.beneficiary.findMany({
+      where: { membershipId: membership.id },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async updateBeneficiary(
+    cooperativeId: string,
+    userId: string,
+    beneficiaryId: string,
+    requester: AuthenticatedUser,
+    dto: UpdateBeneficiaryDto,
+  ) {
+    await this.assertSelfOrGovernance(cooperativeId, userId, requester);
+    const membership = await this.getActiveMembershipOrThrow(
+      cooperativeId,
+      userId,
+    );
+
+    const beneficiary = await this.prisma.beneficiary.findUnique({
+      where: { id: beneficiaryId },
+    });
+    if (!beneficiary || beneficiary.membershipId !== membership.id) {
+      throw new NotFoundException('Beneficiary not found');
+    }
+
+    return this.prisma.beneficiary.update({
+      where: { id: beneficiaryId },
+      data: dto,
+    });
+  }
+
+  async removeBeneficiary(
+    cooperativeId: string,
+    userId: string,
+    beneficiaryId: string,
+    requester: AuthenticatedUser,
+  ) {
+    await this.assertSelfOrGovernance(cooperativeId, userId, requester);
+    const membership = await this.getActiveMembershipOrThrow(
+      cooperativeId,
+      userId,
+    );
+
+    const beneficiary = await this.prisma.beneficiary.findUnique({
+      where: { id: beneficiaryId },
+    });
+    if (!beneficiary || beneficiary.membershipId !== membership.id) {
+      throw new NotFoundException('Beneficiary not found');
+    }
+    await this.prisma.beneficiary.delete({ where: { id: beneficiaryId } });
+  }
+
+  async listAuditLogs(cooperativeId: string) {
+    await this.getCooperativeOrThrow(cooperativeId);
+    return this.auditLog.listForCooperative(cooperativeId);
+  }
+
+  private async getPendingMembershipOrThrow(
+    cooperativeId: string,
+    userId: string,
+  ) {
+    const membership = await this.prisma.cooperativeMembership.findUnique({
+      where: { cooperativeId_userId: { cooperativeId, userId } },
+    });
+    if (!membership || membership.status !== MembershipStatus.PENDING) {
+      throw new NotFoundException('No pending membership application found');
+    }
+    return membership;
+  }
+
+  private async getActiveMembershipOrThrow(
+    cooperativeId: string,
+    userId: string,
+  ) {
+    const membership = await this.prisma.cooperativeMembership.findUnique({
+      where: { cooperativeId_userId: { cooperativeId, userId } },
+    });
+    if (!membership || membership.status !== MembershipStatus.ACTIVE) {
+      throw new NotFoundException('No active membership found');
+    }
+    return membership;
+  }
+
+  private async assertSelfOrGovernance(
+    cooperativeId: string,
+    targetUserId: string,
+    requester: AuthenticatedUser,
+  ) {
+    if (
+      requester.userId === targetUserId ||
+      requester.role === Role.SUPER_ADMIN
+    ) {
+      return;
+    }
+    const requesterMembership =
+      await this.prisma.cooperativeMembership.findUnique({
+        where: {
+          cooperativeId_userId: { cooperativeId, userId: requester.userId },
+        },
+      });
+    const hasGovernanceRole =
+      !!requesterMembership &&
+      requesterMembership.status === MembershipStatus.ACTIVE &&
+      (MANAGE_GOVERNANCE_ROLES as readonly Role[]).includes(
+        requesterMembership.role,
+      );
+    if (!hasGovernanceRole) {
+      throw new ForbiddenException(
+        'You do not have permission to manage this member',
+      );
+    }
+  }
+
+  private async generateMembershipNumber(
+    cooperativeId: string,
+  ): Promise<string> {
+    const cooperative = await this.prisma.cooperative.findUniqueOrThrow({
+      where: { id: cooperativeId },
+    });
+    const count = await this.prisma.cooperativeMembership.count({
+      where: { cooperativeId, membershipNumber: { not: null } },
+    });
+    const prefix = cooperative.slug.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return `${prefix}-${String(count + 1).padStart(4, '0')}`;
+  }
+
+  private async assignMembershipNumber(
+    cooperativeId: string,
+    membershipId: string,
+  ) {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const membershipNumber =
+        await this.generateMembershipNumber(cooperativeId);
+      try {
+        return await this.prisma.cooperativeMembership.update({
+          where: { id: membershipId },
+          data: { membershipNumber },
+        });
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002'
+        ) {
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new ConflictException(
+      'Could not assign a membership number, please retry',
+    );
   }
 
   private async getCooperativeOrThrow(cooperativeId: string) {

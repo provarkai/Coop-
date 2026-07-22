@@ -1,5 +1,6 @@
 // Sprint 1: authentication, sessions, and role-based access control.
 // Sprint 2: cooperatives, branches, committees, and per-cooperative membership.
+// Sprint 3: member KYC, onboarding/approval, guarantors, beneficiaries, audit log.
 
 generator client {
   provider = "prisma-client-js"
@@ -34,6 +35,13 @@ model User {
   mfaEnabled   Boolean   @default(false)
   mfaSecret    String?
 
+  dateOfBirth  DateTime?
+  gender       String?
+  phone        String?
+  address      String?
+  bvn          String?
+  nin          String?
+
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -41,6 +49,7 @@ model User {
   passwordResetTokens    PasswordResetToken[]
   cooperativeMemberships CooperativeMembership[]
   committeeMemberships   CommitteeMember[]
+  guarantorFor           Guarantor[]
 }
 
 model RefreshToken {
@@ -71,6 +80,7 @@ enum MembershipStatus {
   PENDING
   ACTIVE
   SUSPENDED
+  REJECTED
   EXITED
 }
 
@@ -93,6 +103,7 @@ model Cooperative {
   branches    Branch[]
   committees  Committee[]
   memberships CooperativeMembership[]
+  auditLogs   AuditLog[]
 }
 
 model Branch {
@@ -150,6 +161,54 @@ model CooperativeMembership {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
+  guarantors    Guarantor[]
+  beneficiaries Beneficiary[]
+
   @@unique([cooperativeId, userId])
   @@unique([cooperativeId, membershipNumber])
+}
+
+enum GuarantorStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+model Guarantor {
+  id              String                @id @default(cuid())
+  membershipId    String
+  membership      CooperativeMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  guarantorUserId String
+  guarantorUser   User                  @relation(fields: [guarantorUserId], references: [id], onDelete: Cascade)
+  status          GuarantorStatus       @default(PENDING)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@unique([membershipId, guarantorUserId])
+}
+
+model Beneficiary {
+  id           String                @id @default(cuid())
+  membershipId String
+  membership   CooperativeMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  fullName     String
+  relationship String
+  phone        String?
+  address      String?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+}
+
+model AuditLog {
+  id            String       @id @default(cuid())
+  cooperativeId String?
+  cooperative   Cooperative? @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  actorUserId   String?
+  action        String
+  targetType    String
+  targetId      String?
+  metadata      Json?
+  createdAt     DateTime     @default(now())
+
+  @@index([cooperativeId])
 }

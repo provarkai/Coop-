@@ -53,6 +53,12 @@ export default function DashboardPage() {
             My cooperatives
           </Link>
           <Link
+            href="/profile"
+            className="w-full rounded-full border border-black/[.08] px-5 py-2 text-center text-sm font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+          >
+            My profile
+          </Link>
+          <Link
             href="/mfa"
             className="w-full rounded-full border border-black/[.08] px-5 py-2 text-center text-sm font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
           >

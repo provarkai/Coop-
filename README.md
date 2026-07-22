@@ -9,8 +9,9 @@ See [`docs/PRD.md`](docs/PRD.md), [`docs/SDD.md`](docs/SDD.md), [`docs/ROADMAP.m
 - **Sprint 0 (project setup):** done.
 - **Sprint 1 (Authentication & RBAC):** done. Registration, login, JWT access/refresh tokens with rotation, password reset, TOTP-based MFA, and role-based access control, with a matching Next.js UI (login, register, dashboard, MFA management, forgot/reset password).
 - **Sprint 2 (Cooperative Management):** done. Cooperative creation (creator becomes `COOPERATIVE_ADMIN`), branches, committees with membership, per-cooperative membership with roles/status/category, by-laws and financial-year settings, and cooperative-scoped RBAC, with a matching Next.js UI (cooperative list/create/detail pages).
+- **Sprint 3 (Member Management):** done. Self-service membership applications with admin approval/rejection (auto-assigning a membership number), KYC profile fields (DOB, gender, phone, address, BVN, NIN), guarantor nomination with guarantor-side confirmation, beneficiaries, a digital membership card with a QR code, and an audit log of membership lifecycle events — with a matching Next.js UI (profile page, join-by-invite-link flow, pending-applications approval, member detail page with card/guarantors/beneficiaries, audit log view).
 
-See the Playbook for the remaining sprint sequence, starting with Sprint 3 (Member Management).
+See the Playbook for the remaining sprint sequence, starting with Sprint 4 (Savings Engine).
 
 ## Structure
 
@@ -90,6 +91,21 @@ All routes require a valid JWT except the ones above marked public by design (re
 | `PATCH\|DELETE /cooperatives/:id/members/:userId` | Update a member's role/status, or remove them |
 
 Cooperative-scoped RBAC is enforced by `@CooperativeRoles(...)` + `CooperativeRolesGuard`, which checks the caller's `CooperativeMembership.role` for the cooperative in the `:id` route param (a platform `SUPER_ADMIN` bypasses this check).
+
+## Member Management API
+
+| Endpoint | Description |
+| --- | --- |
+| `GET /cooperatives/:id/preview` | Cooperative name/slug only, visible to non-members (used by the join flow) |
+| `POST /cooperatives/:id/apply` | Apply for membership as `PENDING` |
+| `POST /cooperatives/:id/members/:userId/approve` \| `/reject` | Governance-only; approving assigns a membership number |
+| `GET /cooperatives/:id/members/:userId/card` | Digital membership card + QR code (self or governance) |
+| `POST\|GET /cooperatives/:id/members/:userId/guarantors` | Nominate/list guarantors (self or governance) |
+| `PATCH /cooperatives/:id/guarantors/:guarantorId/respond` | Only the nominated guarantor can approve/decline |
+| `DELETE /cooperatives/:id/members/:userId/guarantors/:guarantorId` | Remove a guarantor nomination |
+| `POST\|GET\|PATCH\|DELETE /cooperatives/:id/members/:userId/beneficiaries` | Beneficiary CRUD (self or governance) |
+| `GET /cooperatives/:id/audit-logs` | Membership lifecycle audit trail (`COOPERATIVE_ADMIN`/`CHAIRMAN`/`AUDITOR`) |
+| `GET\|PATCH /users/me` | View/update the caller's own KYC profile (DOB, gender, phone, address, BVN, NIN) |
 
 ## CI
 

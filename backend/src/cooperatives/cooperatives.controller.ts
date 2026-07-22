@@ -10,7 +10,6 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { CooperativesService } from './cooperatives.service';
@@ -22,15 +21,18 @@ import { CreateCommitteeDto } from './dto/create-committee.dto';
 import { AddCommitteeMemberDto } from './dto/add-committee-member.dto';
 import { AddMemberDto } from './dto/add-member.dto';
 import { UpdateMembershipDto } from './dto/update-membership.dto';
+import { ApplyDto } from './dto/apply.dto';
+import { AddGuarantorDto } from './dto/add-guarantor.dto';
+import { RespondGuarantorDto } from './dto/respond-guarantor.dto';
+import { CreateBeneficiaryDto } from './dto/create-beneficiary.dto';
+import { UpdateBeneficiaryDto } from './dto/update-beneficiary.dto';
 import { CooperativeRoles } from './decorators/cooperative-roles.decorator';
 import { CooperativeRolesGuard } from './guards/cooperative-roles.guard';
-
-const MANAGE_COOPERATIVE = [Role.COOPERATIVE_ADMIN, Role.CHAIRMAN] as const;
-const MANAGE_GOVERNANCE = [
-  Role.COOPERATIVE_ADMIN,
-  Role.CHAIRMAN,
-  Role.SECRETARY,
-] as const;
+import {
+  MANAGE_COOPERATIVE_ROLES as MANAGE_COOPERATIVE,
+  MANAGE_GOVERNANCE_ROLES as MANAGE_GOVERNANCE,
+  AUDIT_ROLES,
+} from './roles.constants';
 
 @UseGuards(CooperativeRolesGuard)
 @Controller('cooperatives')
@@ -53,6 +55,13 @@ export class CooperativesController {
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.cooperatives.findOne(id, user);
+  }
+
+  // Lets a prospective member see the cooperative's name before applying,
+  // without exposing full details to non-members.
+  @Get(':id/preview')
+  getPreview(@Param('id') id: string) {
+    return this.cooperatives.getPreview(id);
   }
 
   @CooperativeRoles(...MANAGE_COOPERATIVE)
@@ -132,8 +141,12 @@ export class CooperativesController {
 
   @CooperativeRoles(...MANAGE_GOVERNANCE)
   @Post(':id/members')
-  addMember(@Param('id') id: string, @Body() dto: AddMemberDto) {
-    return this.cooperatives.addMember(id, dto);
+  addMember(
+    @Param('id') id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: AddMemberDto,
+  ) {
+    return this.cooperatives.addMember(id, actor, dto);
   }
 
   @Get(':id/members')
@@ -146,9 +159,10 @@ export class CooperativesController {
   updateMembership(
     @Param('id') id: string,
     @Param('userId') userId: string,
+    @CurrentUser() actor: AuthenticatedUser,
     @Body() dto: UpdateMembershipDto,
   ) {
-    return this.cooperatives.updateMembership(id, userId, dto);
+    return this.cooperatives.updateMembership(id, userId, actor, dto);
   }
 
   @CooperativeRoles(...MANAGE_COOPERATIVE)
@@ -157,7 +171,149 @@ export class CooperativesController {
   async removeMembership(
     @Param('id') id: string,
     @Param('userId') userId: string,
+    @CurrentUser() actor: AuthenticatedUser,
   ) {
-    await this.cooperatives.removeMembership(id, userId);
+    await this.cooperatives.removeMembership(id, userId, actor);
+  }
+
+  @Post(':id/apply')
+  apply(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ApplyDto,
+  ) {
+    return this.cooperatives.apply(id, user, dto);
+  }
+
+  @CooperativeRoles(...MANAGE_GOVERNANCE)
+  @Post(':id/members/:userId/approve')
+  approveMembership(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.cooperatives.approveMembership(id, userId, actor);
+  }
+
+  @CooperativeRoles(...MANAGE_GOVERNANCE)
+  @Post(':id/members/:userId/reject')
+  rejectMembership(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.cooperatives.rejectMembership(id, userId, actor);
+  }
+
+  @Get(':id/members/:userId/card')
+  getMembershipCard(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @CurrentUser() requester: AuthenticatedUser,
+  ) {
+    return this.cooperatives.getMembershipCard(id, userId, requester);
+  }
+
+  @Post(':id/members/:userId/guarantors')
+  addGuarantor(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @CurrentUser() requester: AuthenticatedUser,
+    @Body() dto: AddGuarantorDto,
+  ) {
+    return this.cooperatives.addGuarantor(id, userId, requester, dto);
+  }
+
+  @Get(':id/members/:userId/guarantors')
+  listGuarantors(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @CurrentUser() requester: AuthenticatedUser,
+  ) {
+    return this.cooperatives.listGuarantors(id, userId, requester);
+  }
+
+  @Patch(':id/guarantors/:guarantorId/respond')
+  respondToGuarantorRequest(
+    @Param('id') id: string,
+    @Param('guarantorId') guarantorId: string,
+    @CurrentUser() requester: AuthenticatedUser,
+    @Body() dto: RespondGuarantorDto,
+  ) {
+    return this.cooperatives.respondToGuarantorRequest(
+      id,
+      guarantorId,
+      requester,
+      dto,
+    );
+  }
+
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete(':id/members/:userId/guarantors/:guarantorId')
+  async removeGuarantor(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Param('guarantorId') guarantorId: string,
+    @CurrentUser() requester: AuthenticatedUser,
+  ) {
+    await this.cooperatives.removeGuarantor(id, userId, guarantorId, requester);
+  }
+
+  @Post(':id/members/:userId/beneficiaries')
+  addBeneficiary(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @CurrentUser() requester: AuthenticatedUser,
+    @Body() dto: CreateBeneficiaryDto,
+  ) {
+    return this.cooperatives.addBeneficiary(id, userId, requester, dto);
+  }
+
+  @Get(':id/members/:userId/beneficiaries')
+  listBeneficiaries(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @CurrentUser() requester: AuthenticatedUser,
+  ) {
+    return this.cooperatives.listBeneficiaries(id, userId, requester);
+  }
+
+  @Patch(':id/members/:userId/beneficiaries/:beneficiaryId')
+  updateBeneficiary(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Param('beneficiaryId') beneficiaryId: string,
+    @CurrentUser() requester: AuthenticatedUser,
+    @Body() dto: UpdateBeneficiaryDto,
+  ) {
+    return this.cooperatives.updateBeneficiary(
+      id,
+      userId,
+      beneficiaryId,
+      requester,
+      dto,
+    );
+  }
+
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete(':id/members/:userId/beneficiaries/:beneficiaryId')
+  async removeBeneficiary(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Param('beneficiaryId') beneficiaryId: string,
+    @CurrentUser() requester: AuthenticatedUser,
+  ) {
+    await this.cooperatives.removeBeneficiary(
+      id,
+      userId,
+      beneficiaryId,
+      requester,
+    );
+  }
+
+  @CooperativeRoles(...AUDIT_ROLES)
+  @Get(':id/audit-logs')
+  listAuditLogs(@Param('id') id: string) {
+    return this.cooperatives.listAuditLogs(id);
   }
 }

@@ -7,6 +7,7 @@ import {
   api,
   ApiError,
   getAccessToken,
+  type AuditLogEntry,
   type Branch,
   type Committee,
   type Cooperative,
@@ -37,7 +38,10 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
   const [branches, setBranches] = useState<Branch[]>([]);
   const [committees, setCommittees] = useState<Committee[]>([]);
   const [members, setMembers] = useState<CooperativeMembership[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[] | null>(null);
+  const [inviteLink, setInviteLink] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [pendingError, setPendingError] = useState<string | null>(null);
 
   const [bylaws, setBylaws] = useState("");
   const [financialYearStartMonth, setFinancialYearStartMonth] = useState(1);
@@ -68,6 +72,14 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
     setBranches(branchList);
     setCommittees(committeeList);
     setMembers(memberList);
+
+    // Audit logs are governance/auditor-only; a 403 here just means this
+    // viewer isn't one, so the section stays hidden rather than erroring.
+    try {
+      setAuditLogs(await api.listAuditLogs(id));
+    } catch {
+      setAuditLogs(null);
+    }
   }
 
   useEffect(() => {
@@ -76,6 +88,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
       return;
     }
     async function load() {
+      setInviteLink(`${window.location.origin}/cooperatives/${id}/join`);
       try {
         await reload();
       } catch (err) {
@@ -85,6 +98,26 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, router]);
+
+  async function onApproveMember(userId: string) {
+    setPendingError(null);
+    try {
+      await api.approveMembership(id, userId);
+      setMembers(await api.listMembers(id));
+    } catch (err) {
+      setPendingError(err instanceof ApiError ? err.message : "Something went wrong");
+    }
+  }
+
+  async function onRejectMember(userId: string) {
+    setPendingError(null);
+    try {
+      await api.rejectMembership(id, userId);
+      setMembers(await api.listMembers(id));
+    } catch (err) {
+      setPendingError(err instanceof ApiError ? err.message : "Something went wrong");
+    }
+  }
 
   async function onSaveSettings(e: FormEvent) {
     e.preventDefault();
@@ -209,6 +242,11 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
         </Link>
         <h1 className="mt-2 text-2xl font-semibold text-black dark:text-zinc-50">{cooperative.name}</h1>
         <p className="text-sm text-zinc-500 dark:text-zinc-500">/{cooperative.slug}</p>
+        {inviteLink && (
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+            Invite link: <span className="break-all">{inviteLink}</span>
+          </p>
+        )}
       </div>
 
       <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
@@ -343,37 +381,72 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
         </form>
       </section>
 
+      {members.some((m) => m.status === "PENDING") && (
+        <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+          <h2 className="font-semibold text-black dark:text-zinc-50">Pending applications</h2>
+          <ErrorText message={pendingError} />
+          <ul className="space-y-2">
+            {members
+              .filter((m) => m.status === "PENDING")
+              .map((m) => (
+                <li key={m.id} className="flex items-center justify-between text-sm">
+                  <span>
+                    {m.user.firstName} {m.user.lastName}{" "}
+                    <span className="text-zinc-500 dark:text-zinc-500">({m.user.email})</span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => onApproveMember(m.userId)}
+                      className="rounded-full border border-black/[.08] px-3 py-1 text-xs font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => onRejectMember(m.userId)}
+                      className="text-xs text-red-600 hover:underline dark:text-red-400"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
+
       <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
         <h2 className="font-semibold text-black dark:text-zinc-50">Members</h2>
         <ErrorText message={memberError} />
         <ul className="space-y-2">
-          {members.map((m) => (
-            <li key={m.id} className="flex items-center justify-between text-sm">
-              <span>
-                {m.user.firstName} {m.user.lastName}{" "}
-                <span className="text-zinc-500 dark:text-zinc-500">({m.user.email})</span>
-              </span>
-              <div className="flex items-center gap-2">
-                <select
-                  className="rounded-md border border-black/[.08] bg-transparent px-2 py-1 text-xs dark:border-white/[.145]"
-                  value={m.role}
-                  onChange={(e) => onUpdateMemberRole(m.userId, e.target.value)}
-                >
-                  {COOPERATIVE_ROLES.map((role) => (
-                    <option key={role} value={role}>
-                      {role}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => onRemoveMember(m.userId)}
-                  className="text-xs text-red-600 hover:underline dark:text-red-400"
-                >
-                  Remove
-                </button>
-              </div>
-            </li>
-          ))}
+          {members
+            .filter((m) => m.status === "ACTIVE")
+            .map((m) => (
+              <li key={m.id} className="flex items-center justify-between text-sm">
+                <Link href={`/cooperatives/${id}/members/${m.userId}`} className="hover:underline">
+                  {m.user.firstName} {m.user.lastName}{" "}
+                  <span className="text-zinc-500 dark:text-zinc-500">({m.user.email})</span>
+                </Link>
+                <div className="flex items-center gap-2">
+                  <select
+                    className="rounded-md border border-black/[.08] bg-transparent px-2 py-1 text-xs dark:border-white/[.145]"
+                    value={m.role}
+                    onChange={(e) => onUpdateMemberRole(m.userId, e.target.value)}
+                  >
+                    {COOPERATIVE_ROLES.map((role) => (
+                      <option key={role} value={role}>
+                        {role}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => onRemoveMember(m.userId)}
+                    className="text-xs text-red-600 hover:underline dark:text-red-400"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </li>
+            ))}
         </ul>
         <form onSubmit={onAddMember} className="flex gap-2">
           <input
@@ -403,6 +476,20 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
           </button>
         </form>
       </section>
+
+      {auditLogs && (
+        <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+          <h2 className="font-semibold text-black dark:text-zinc-50">Audit log</h2>
+          <ul className="space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+            {auditLogs.map((entry) => (
+              <li key={entry.id}>
+                {new Date(entry.createdAt).toLocaleString()} — {entry.action}
+              </li>
+            ))}
+            {auditLogs.length === 0 && <li>No activity recorded yet.</li>}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

@@ -23,4 +23,67 @@ export class UsersService {
   }) {
     return this.prisma.user.create({ data });
   }
+
+  updateProfile(
+    id: string,
+    data: {
+      firstName?: string;
+      lastName?: string;
+      dateOfBirth?: Date;
+      gender?: string;
+      phone?: string;
+      address?: string;
+      bvn?: string;
+      nin?: string;
+    },
+  ) {
+    return this.prisma.user.update({ where: { id }, data });
+  }
+
+  toPublicProfile(user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: Role;
+    dateOfBirth: Date | null;
+    gender: string | null;
+    phone: string | null;
+    address: string | null;
+    bvn: string | null;
+    nin: string | null;
+    mfaEnabled: boolean;
+    createdAt: Date;
+  }) {
+    const {
+      id,
+      email,
+      firstName,
+      lastName,
+      role,
+      dateOfBirth,
+      gender,
+      phone,
+      address,
+      bvn,
+      nin,
+      mfaEnabled,
+      createdAt,
+    } = user;
+    return {
+      id,
+      email,
+      firstName,
+      lastName,
+      role,
+      dateOfBirth,
+      gender,
+      phone,
+      address,
+      bvn,
+      nin,
+      mfaEnabled,
+      createdAt,
+    };
+  }
 }
