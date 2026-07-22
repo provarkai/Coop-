@@ -1,4 +1,5 @@
-// Sprint 1 schema: authentication, sessions, and role-based access control.
+// Sprint 1: authentication, sessions, and role-based access control.
+// Sprint 2: cooperatives, branches, committees, and per-cooperative membership.
 
 generator client {
   provider = "prisma-client-js"
@@ -36,8 +37,10 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  refreshTokens       RefreshToken[]
-  passwordResetTokens PasswordResetToken[]
+  refreshTokens          RefreshToken[]
+  passwordResetTokens    PasswordResetToken[]
+  cooperativeMemberships CooperativeMembership[]
+  committeeMemberships   CommitteeMember[]
 }
 
 model RefreshToken {
@@ -62,4 +65,91 @@ model PasswordResetToken {
   createdAt DateTime  @default(now())
 
   @@index([userId])
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  EXITED
+}
+
+model Cooperative {
+  id                      String   @id @default(cuid())
+  name                    String
+  slug                    String   @unique
+  registrationNumber      String?
+  email                   String?
+  phone                   String?
+  address                 String?
+  bylaws                  String?
+  financialYearStartMonth Int      @default(1)
+  financialYearStartDay   Int      @default(1)
+  currency                String   @default("NGN")
+  isActive                Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  branches    Branch[]
+  committees  Committee[]
+  memberships CooperativeMembership[]
+}
+
+model Branch {
+  id            String      @id @default(cuid())
+  cooperativeId String
+  cooperative   Cooperative @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  name          String
+  address       String?
+  phone         String?
+  email         String?
+  isHeadOffice  Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([cooperativeId, name])
+}
+
+model Committee {
+  id            String      @id @default(cuid())
+  cooperativeId String
+  cooperative   Cooperative @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  members CommitteeMember[]
+
+  @@unique([cooperativeId, name])
+}
+
+model CommitteeMember {
+  id          String    @id @default(cuid())
+  committeeId String
+  committee   Committee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String?
+  joinedAt    DateTime  @default(now())
+
+  @@unique([committeeId, userId])
+}
+
+model CooperativeMembership {
+  id               String           @id @default(cuid())
+  cooperativeId    String
+  cooperative      Cooperative      @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role             Role             @default(MEMBER)
+  status           MembershipStatus @default(ACTIVE)
+  membershipNumber String?
+  category         String           @default("ORDINARY")
+  joinedAt         DateTime         @default(now())
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@unique([cooperativeId, userId])
+  @@unique([cooperativeId, membershipNumber])
 }

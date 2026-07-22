@@ -16,6 +16,57 @@ export interface TokenPair {
   refreshToken: string;
 }
 
+export interface Cooperative {
+  id: string;
+  name: string;
+  slug: string;
+  registrationNumber: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  bylaws: string | null;
+  financialYearStartMonth: number;
+  financialYearStartDay: number;
+  currency: string;
+  isActive: boolean;
+}
+
+export interface Branch {
+  id: string;
+  cooperativeId: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  isHeadOffice: boolean;
+}
+
+export interface CommitteeMember {
+  id: string;
+  userId: string;
+  title: string | null;
+  user: { id: string; email: string; firstName: string; lastName: string };
+}
+
+export interface Committee {
+  id: string;
+  cooperativeId: string;
+  name: string;
+  description: string | null;
+  members: CommitteeMember[];
+}
+
+export interface CooperativeMembership {
+  id: string;
+  cooperativeId: string;
+  userId: string;
+  role: string;
+  status: string;
+  category: string;
+  membershipNumber: string | null;
+  user: { id: string; email: string; firstName: string; lastName: string };
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -116,4 +167,70 @@ export const api = {
       { method: "POST", body: JSON.stringify({ code }) },
       true,
     ),
+
+  listCooperatives: () => request<Cooperative[]>("/cooperatives", { method: "GET" }, true),
+
+  createCooperative: (data: { name: string; slug: string }) =>
+    request<Cooperative>("/cooperatives", { method: "POST", body: JSON.stringify(data) }, true),
+
+  getCooperative: (id: string) => request<Cooperative>(`/cooperatives/${id}`, { method: "GET" }, true),
+
+  updateCooperative: (
+    id: string,
+    data: Partial<
+      Pick<
+        Cooperative,
+        "name" | "registrationNumber" | "email" | "phone" | "address" | "bylaws" | "financialYearStartMonth" | "currency"
+      >
+    >,
+  ) => request<Cooperative>(`/cooperatives/${id}`, { method: "PATCH", body: JSON.stringify(data) }, true),
+
+  listBranches: (cooperativeId: string) =>
+    request<Branch[]>(`/cooperatives/${cooperativeId}/branches`, { method: "GET" }, true),
+
+  createBranch: (cooperativeId: string, data: { name: string; address?: string; isHeadOffice?: boolean }) =>
+    request<Branch>(`/cooperatives/${cooperativeId}/branches`, { method: "POST", body: JSON.stringify(data) }, true),
+
+  deleteBranch: (cooperativeId: string, branchId: string) =>
+    request<void>(`/cooperatives/${cooperativeId}/branches/${branchId}`, { method: "DELETE" }, true),
+
+  listCommittees: (cooperativeId: string) =>
+    request<Committee[]>(`/cooperatives/${cooperativeId}/committees`, { method: "GET" }, true),
+
+  createCommittee: (cooperativeId: string, data: { name: string; description?: string }) =>
+    request<Committee>(`/cooperatives/${cooperativeId}/committees`, { method: "POST", body: JSON.stringify(data) }, true),
+
+  addCommitteeMember: (cooperativeId: string, committeeId: string, data: { email: string; title?: string }) =>
+    request<CommitteeMember>(
+      `/cooperatives/${cooperativeId}/committees/${committeeId}/members`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  removeCommitteeMember: (cooperativeId: string, committeeId: string, userId: string) =>
+    request<void>(
+      `/cooperatives/${cooperativeId}/committees/${committeeId}/members/${userId}`,
+      { method: "DELETE" },
+      true,
+    ),
+
+  listMembers: (cooperativeId: string) =>
+    request<CooperativeMembership[]>(`/cooperatives/${cooperativeId}/members`, { method: "GET" }, true),
+
+  addMember: (cooperativeId: string, data: { email: string; role?: string; category?: string }) =>
+    request<CooperativeMembership>(
+      `/cooperatives/${cooperativeId}/members`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  updateMembership: (cooperativeId: string, userId: string, data: { role?: string; status?: string }) =>
+    request<CooperativeMembership>(
+      `/cooperatives/${cooperativeId}/members/${userId}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      true,
+    ),
+
+  removeMembership: (cooperativeId: string, userId: string) =>
+    request<void>(`/cooperatives/${cooperativeId}/members/${userId}`, { method: "DELETE" }, true),
 };

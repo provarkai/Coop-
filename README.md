@@ -8,8 +8,9 @@ See [`docs/PRD.md`](docs/PRD.md), [`docs/SDD.md`](docs/SDD.md), [`docs/ROADMAP.m
 
 - **Sprint 0 (project setup):** done.
 - **Sprint 1 (Authentication & RBAC):** done. Registration, login, JWT access/refresh tokens with rotation, password reset, TOTP-based MFA, and role-based access control, with a matching Next.js UI (login, register, dashboard, MFA management, forgot/reset password).
+- **Sprint 2 (Cooperative Management):** done. Cooperative creation (creator becomes `COOPERATIVE_ADMIN`), branches, committees with membership, per-cooperative membership with roles/status/category, by-laws and financial-year settings, and cooperative-scoped RBAC, with a matching Next.js UI (cooperative list/create/detail pages).
 
-See the Playbook for the remaining sprint sequence, starting with Sprint 2 (Cooperative Management).
+See the Playbook for the remaining sprint sequence, starting with Sprint 3 (Member Management).
 
 ## Structure
 
@@ -71,7 +72,24 @@ Runs at `http://localhost:3000`.
 | `POST /auth/mfa/enable` / `/auth/mfa/disable` | Confirm a TOTP code to toggle MFA |
 | `GET /auth/me` | Current authenticated user |
 
-All routes require a valid JWT except the ones above marked public by design (register, login, refresh, forgot/reset password). Use `@Roles(...)` + the global `RolesGuard` to restrict a route to specific cooperative roles.
+All routes require a valid JWT except the ones above marked public by design (register, login, refresh, forgot/reset password). Use `@Roles(...)` + the global `RolesGuard` to restrict a route to specific platform-wide roles.
+
+## Cooperatives API
+
+| Endpoint | Description |
+| --- | --- |
+| `POST /cooperatives` | Create a cooperative; creator becomes its `COOPERATIVE_ADMIN` |
+| `GET /cooperatives` | List cooperatives the caller belongs to (all, for `SUPER_ADMIN`) |
+| `GET /cooperatives/:id` | Get a cooperative (any active member) |
+| `PATCH /cooperatives/:id` | Update settings, by-laws, financial year (`COOPERATIVE_ADMIN`/`CHAIRMAN`) |
+| `POST\|GET /cooperatives/:id/branches` | Create/list branches |
+| `PATCH\|DELETE /cooperatives/:id/branches/:branchId` | Update/remove a branch |
+| `POST\|GET /cooperatives/:id/committees` | Create/list committees |
+| `POST\|DELETE /cooperatives/:id/committees/:committeeId/members` | Add/remove a committee member (by email; must already be a cooperative member) |
+| `POST\|GET /cooperatives/:id/members` | Add/list cooperative members (by email, with role/category) |
+| `PATCH\|DELETE /cooperatives/:id/members/:userId` | Update a member's role/status, or remove them |
+
+Cooperative-scoped RBAC is enforced by `@CooperativeRoles(...)` + `CooperativeRolesGuard`, which checks the caller's `CooperativeMembership.role` for the cooperative in the `:id` route param (a platform `SUPER_ADMIN` bypasses this check).
 
 ## CI
 
