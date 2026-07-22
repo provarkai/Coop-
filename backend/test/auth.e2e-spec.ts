@@ -82,6 +82,9 @@ describe('Auth (e2e)', () => {
       .expect(200);
 
     expect(res.body.email).toBe(email);
+    expect(res.body.id).toEqual(expect.any(String));
+    expect(res.body.firstName).toEqual(expect.any(String));
+    expect(res.body.userId).toBeUndefined();
   });
 
   it('enforces RBAC: a MEMBER cannot hit an admin-only route', async () => {

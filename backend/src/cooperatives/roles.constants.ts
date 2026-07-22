@@ -14,3 +14,14 @@ export const AUDIT_ROLES = [
   Role.CHAIRMAN,
   Role.AUDITOR,
 ] as const;
+export const MANAGE_SAVINGS_ROLES = [
+  Role.COOPERATIVE_ADMIN,
+  Role.CHAIRMAN,
+  Role.TREASURER,
+] as const;
+export const VIEW_SAVINGS_ROLES = [
+  Role.COOPERATIVE_ADMIN,
+  Role.CHAIRMAN,
+  Role.TREASURER,
+  Role.AUDITOR,
+] as const;

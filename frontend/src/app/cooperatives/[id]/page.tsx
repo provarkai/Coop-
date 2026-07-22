@@ -14,6 +14,10 @@ import {
   type ComplianceFiling,
   type Cooperative,
   type CooperativeMembership,
+  type SavingsAccount,
+  type SavingsProduct,
+  type SavingsReceipt,
+  type SavingsTransaction,
 } from "@/lib/api";
 
 const FILING_TYPES = ["ANNUAL_RETURN", "FINANCIAL_STATEMENT", "AGM_MINUTES", "OTHER"];
@@ -70,6 +74,23 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
   const [filingTitle, setFilingTitle] = useState("");
   const [filingError, setFilingError] = useState<string | null>(null);
 
+  const [savingsProducts, setSavingsProducts] = useState<SavingsProduct[]>([]);
+  const [savingsAccounts, setSavingsAccounts] = useState<SavingsAccount[] | null>(null);
+  const [mySavingsAccounts, setMySavingsAccounts] = useState<SavingsAccount[]>([]);
+  const [productName, setProductName] = useState("");
+  const [productCode, setProductCode] = useState("");
+  const [productRate, setProductRate] = useState("0");
+  const [productMinBalance, setProductMinBalance] = useState("0");
+  const [productError, setProductError] = useState<string | null>(null);
+  const [openAccountProduct, setOpenAccountProduct] = useState<Record<string, string>>({});
+  const [savingsError, setSavingsError] = useState<string | null>(null);
+  const [transactionDrafts, setTransactionDrafts] = useState<
+    Record<string, { type: "DEPOSIT" | "WITHDRAWAL"; amount: string; narration: string }>
+  >({});
+  const [statements, setStatements] = useState<Record<string, SavingsTransaction[]>>({});
+  const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
+  const [receipts, setReceipts] = useState<Record<string, SavingsReceipt>>({});
+
   async function reload() {
     const [coop, branchList, committeeList, memberList] = await Promise.all([
       api.getCooperative(id),
@@ -84,6 +105,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
     setCommittees(committeeList);
     setMembers(memberList);
     setFilings(await api.listComplianceFilingsForCooperative(id));
+    setSavingsProducts(await api.listSavingsProducts(id));
 
     // Audit logs are governance/auditor-only; a 403 here just means this
     // viewer isn't one, so the section stays hidden rather than erroring.
@@ -92,6 +114,17 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
     } catch {
       setAuditLogs(null);
     }
+
+    // The cooperative-wide savings ledger is treasurer/governance/auditor-only.
+    try {
+      setSavingsAccounts(await api.listSavingsAccountsForCooperative(id));
+    } catch {
+      setSavingsAccounts(null);
+    }
+  }
+
+  async function reloadMySavings(userId: string) {
+    setMySavingsAccounts(await api.listSavingsAccountsForMember(id, userId));
   }
 
   useEffect(() => {
@@ -102,8 +135,10 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
     async function load() {
       setInviteLink(`${window.location.origin}/cooperatives/${id}/join`);
       try {
-        setMe(await api.me());
+        const currentUser = await api.me();
+        setMe(currentUser);
         await reload();
+        await reloadMySavings(currentUser.id);
       } catch (err) {
         setLoadError(err instanceof ApiError ? err.message : "Something went wrong");
       }
@@ -240,6 +275,92 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
     }
   }
 
+  async function onCreateSavingsProduct(e: FormEvent) {
+    e.preventDefault();
+    setProductError(null);
+    try {
+      await api.createSavingsProduct(id, {
+        name: productName,
+        code: productCode,
+        interestRatePercent: Number(productRate),
+        minimumBalance: Number(productMinBalance),
+      });
+      setProductName("");
+      setProductCode("");
+      setProductRate("0");
+      setProductMinBalance("0");
+      setSavingsProducts(await api.listSavingsProducts(id));
+    } catch (err) {
+      setProductError(err instanceof ApiError ? err.message : "Something went wrong");
+    }
+  }
+
+  async function onOpenSavingsAccount(userId: string) {
+    const productId = openAccountProduct[userId];
+    if (!productId) return;
+    setSavingsError(null);
+    try {
+      await api.openSavingsAccount(id, userId, { productId });
+      setOpenAccountProduct((prev) => ({ ...prev, [userId]: "" }));
+      setSavingsAccounts(await api.listSavingsAccountsForCooperative(id));
+      if (userId === me?.id) await reloadMySavings(userId);
+    } catch (err) {
+      setSavingsError(err instanceof ApiError ? err.message : "Something went wrong");
+    }
+  }
+
+  async function onRecordTransaction(accountId: string, memberUserId: string) {
+    const draft = transactionDrafts[accountId];
+    if (!draft || !draft.amount) return;
+    setSavingsError(null);
+    try {
+      await api.recordSavingsTransaction(id, accountId, {
+        type: draft.type,
+        amount: Number(draft.amount),
+        narration: draft.narration || undefined,
+      });
+      setTransactionDrafts((prev) => ({
+        ...prev,
+        [accountId]: { type: "DEPOSIT", amount: "", narration: "" },
+      }));
+      setSavingsAccounts(await api.listSavingsAccountsForCooperative(id));
+      if (memberUserId === me?.id) await reloadMySavings(memberUserId);
+      if (expandedAccounts[accountId]) await onToggleStatement(accountId, true);
+    } catch (err) {
+      setSavingsError(err instanceof ApiError ? err.message : "Something went wrong");
+    }
+  }
+
+  async function onAccrueInterest(accountId: string, memberUserId: string) {
+    setSavingsError(null);
+    try {
+      await api.accrueSavingsInterest(id, accountId);
+      setSavingsAccounts(await api.listSavingsAccountsForCooperative(id));
+      if (memberUserId === me?.id) await reloadMySavings(memberUserId);
+      if (expandedAccounts[accountId]) await onToggleStatement(accountId, true);
+    } catch (err) {
+      setSavingsError(err instanceof ApiError ? err.message : "Something went wrong");
+    }
+  }
+
+  async function onToggleStatement(accountId: string, forceOpen = false) {
+    const willOpen = forceOpen || !expandedAccounts[accountId];
+    if (willOpen) {
+      const transactions = await api.listSavingsTransactions(id, accountId);
+      setStatements((prev) => ({ ...prev, [accountId]: transactions }));
+    }
+    setExpandedAccounts((prev) => ({ ...prev, [accountId]: willOpen }));
+  }
+
+  async function onViewReceipt(accountId: string, transactionId: string) {
+    try {
+      const receipt = await api.getSavingsReceipt(id, accountId, transactionId);
+      setReceipts((prev) => ({ ...prev, [transactionId]: receipt }));
+    } catch (err) {
+      setSavingsError(err instanceof ApiError ? err.message : "Something went wrong");
+    }
+  }
+
   async function onSubmitFiling(e: FormEvent) {
     e.preventDefault();
     setFilingError(null);
@@ -251,6 +372,141 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
     } catch (err) {
       setFilingError(err instanceof ApiError ? err.message : "Something went wrong");
     }
+  }
+
+  function renderStatement(accountId: string) {
+    const txs = statements[accountId];
+    if (!txs) return null;
+    return (
+      <ul className="mt-2 space-y-1 border-t border-black/[.08] pt-2 text-xs dark:border-white/[.145]">
+        {txs.map((t) => (
+          <li key={t.id} className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span>
+                {new Date(t.createdAt).toLocaleDateString()} — {t.type} {t.amount}
+                {t.narration && ` (${t.narration})`}
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="text-zinc-500">bal {t.balanceAfter}</span>
+                <button
+                  onClick={() => onViewReceipt(accountId, t.id)}
+                  className="text-zinc-500 hover:underline"
+                >
+                  Receipt
+                </button>
+              </span>
+            </div>
+            {receipts[t.id] && (
+              <div className="flex items-center gap-3 rounded-md bg-black/[.03] p-2 dark:bg-white/[.05]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={receipts[t.id].qrCodeDataUrl} alt="Receipt QR code" className="h-16 w-16" />
+                <span className="text-zinc-600 dark:text-zinc-400">
+                  {receipts[t.id].account.accountNumber} · {receipts[t.id].member.firstName}{" "}
+                  {receipts[t.id].member.lastName}
+                </span>
+              </div>
+            )}
+          </li>
+        ))}
+        {txs.length === 0 && <li className="text-zinc-500">No transactions yet.</li>}
+      </ul>
+    );
+  }
+
+  function renderManagedSavingsAccount(account: SavingsAccount) {
+    const draft = transactionDrafts[account.id] ?? {
+      type: "DEPOSIT" as const,
+      amount: "",
+      narration: "",
+    };
+    const memberUserId = account.membership?.user.id ?? "";
+    return (
+      <li
+        key={account.id}
+        className="space-y-2 border-b border-black/[.08] pb-3 last:border-0 dark:border-white/[.145]"
+      >
+        <div className="flex items-center justify-between text-sm">
+          <span>
+            {account.membership?.user.firstName} {account.membership?.user.lastName} —{" "}
+            {account.product?.name} <span className="text-zinc-500">({account.accountNumber})</span>
+          </span>
+          <span className="font-medium">₦{account.balance}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            className="rounded-md border border-black/[.08] bg-transparent px-2 py-1 text-xs dark:border-white/[.145]"
+            value={draft.type}
+            onChange={(e) =>
+              setTransactionDrafts((prev) => ({
+                ...prev,
+                [account.id]: { ...draft, type: e.target.value as "DEPOSIT" | "WITHDRAWAL" },
+              }))
+            }
+          >
+            <option value="DEPOSIT">Deposit</option>
+            <option value="WITHDRAWAL">Withdrawal</option>
+          </select>
+          <input
+            className="w-24 rounded-md border border-black/[.08] bg-transparent px-2 py-1 text-xs dark:border-white/[.145]"
+            placeholder="Amount"
+            value={draft.amount}
+            onChange={(e) =>
+              setTransactionDrafts((prev) => ({ ...prev, [account.id]: { ...draft, amount: e.target.value } }))
+            }
+          />
+          <input
+            className="flex-1 rounded-md border border-black/[.08] bg-transparent px-2 py-1 text-xs dark:border-white/[.145]"
+            placeholder="Narration"
+            value={draft.narration}
+            onChange={(e) =>
+              setTransactionDrafts((prev) => ({ ...prev, [account.id]: { ...draft, narration: e.target.value } }))
+            }
+          />
+          <button
+            onClick={() => onRecordTransaction(account.id, memberUserId)}
+            className="rounded-full border border-black/[.08] px-3 py-1 text-xs font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+          >
+            Record
+          </button>
+          <button
+            onClick={() => onAccrueInterest(account.id, memberUserId)}
+            className="rounded-full border border-black/[.08] px-3 py-1 text-xs font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+          >
+            Accrue interest
+          </button>
+          <button
+            onClick={() => onToggleStatement(account.id)}
+            className="text-xs text-zinc-500 hover:underline"
+          >
+            {expandedAccounts[account.id] ? "Hide statement" : "Statement"}
+          </button>
+        </div>
+        {expandedAccounts[account.id] && renderStatement(account.id)}
+      </li>
+    );
+  }
+
+  function renderMySavingsAccount(account: SavingsAccount) {
+    return (
+      <li
+        key={account.id}
+        className="space-y-2 border-b border-black/[.08] pb-3 last:border-0 dark:border-white/[.145]"
+      >
+        <div className="flex items-center justify-between text-sm">
+          <span>
+            {account.product?.name} <span className="text-zinc-500">({account.accountNumber})</span>
+          </span>
+          <span className="font-medium">₦{account.balance}</span>
+        </div>
+        <button
+          onClick={() => onToggleStatement(account.id)}
+          className="text-xs text-zinc-500 hover:underline"
+        >
+          {expandedAccounts[account.id] ? "Hide statement" : "View statement"}
+        </button>
+        {expandedAccounts[account.id] && renderStatement(account.id)}
+      </li>
+    );
   }
 
   if (loadError) {
@@ -474,6 +730,31 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
                       </option>
                     ))}
                   </select>
+                  {savingsProducts.length > 0 && (
+                    <>
+                      <select
+                        className="rounded-md border border-black/[.08] bg-transparent px-2 py-1 text-xs dark:border-white/[.145]"
+                        value={openAccountProduct[m.userId] ?? ""}
+                        onChange={(e) =>
+                          setOpenAccountProduct((prev) => ({ ...prev, [m.userId]: e.target.value }))
+                        }
+                      >
+                        <option value="">Savings product…</option>
+                        {savingsProducts.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => onOpenSavingsAccount(m.userId)}
+                        disabled={!openAccountProduct[m.userId]}
+                        className="rounded-full border border-black/[.08] px-3 py-1 text-xs font-medium text-black transition-colors hover:bg-black/[.04] disabled:opacity-40 dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+                      >
+                        + Savings account
+                      </button>
+                    </>
+                  )}
                   <button
                     onClick={() => onRemoveMember(m.userId)}
                     className="text-xs text-red-600 hover:underline dark:text-red-400"
@@ -512,6 +793,80 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
           </button>
         </form>
       </section>
+
+      <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+        <h2 className="font-semibold text-black dark:text-zinc-50">My savings</h2>
+        <ul className="space-y-2">{mySavingsAccounts.map(renderMySavingsAccount)}</ul>
+        {mySavingsAccounts.length === 0 && (
+          <p className="text-sm text-zinc-500 dark:text-zinc-500">No savings accounts opened yet.</p>
+        )}
+      </section>
+
+      <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+        <h2 className="font-semibold text-black dark:text-zinc-50">Savings products</h2>
+        <ErrorText message={productError} />
+        <ul className="space-y-1 text-sm">
+          {savingsProducts.map((p) => (
+            <li key={p.id} className="flex items-center justify-between">
+              <span>
+                {p.name} <span className="text-xs text-zinc-500">({p.code})</span>
+              </span>
+              <span className="text-xs text-zinc-500">
+                {p.interestRatePercent}% · min ₦{p.minimumBalance}
+                {!p.isActive && " · inactive"}
+              </span>
+            </li>
+          ))}
+          {savingsProducts.length === 0 && (
+            <li className="text-zinc-500 dark:text-zinc-500">No savings products yet.</li>
+          )}
+        </ul>
+        <form onSubmit={onCreateSavingsProduct} className="flex flex-wrap gap-2">
+          <input
+            className="flex-1 rounded-md border border-black/[.08] bg-transparent px-3 py-1.5 text-sm dark:border-white/[.145]"
+            placeholder="Product name"
+            value={productName}
+            onChange={(e) => setProductName(e.target.value)}
+            required
+          />
+          <input
+            className="w-24 rounded-md border border-black/[.08] bg-transparent px-3 py-1.5 text-sm dark:border-white/[.145]"
+            placeholder="Code"
+            value={productCode}
+            onChange={(e) => setProductCode(e.target.value)}
+            required
+          />
+          <input
+            className="w-24 rounded-md border border-black/[.08] bg-transparent px-3 py-1.5 text-sm dark:border-white/[.145]"
+            placeholder="Interest %"
+            value={productRate}
+            onChange={(e) => setProductRate(e.target.value)}
+          />
+          <input
+            className="w-28 rounded-md border border-black/[.08] bg-transparent px-3 py-1.5 text-sm dark:border-white/[.145]"
+            placeholder="Min balance"
+            value={productMinBalance}
+            onChange={(e) => setProductMinBalance(e.target.value)}
+          />
+          <button
+            type="submit"
+            className="rounded-full border border-black/[.08] px-4 py-1.5 text-sm font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+          >
+            Add
+          </button>
+        </form>
+      </section>
+
+      {savingsAccounts && (
+        <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+          <h2 className="font-semibold text-black dark:text-zinc-50">Savings accounts</h2>
+          <ErrorText message={savingsError} />
+          <ul className="space-y-3">{savingsAccounts.map(renderManagedSavingsAccount)}</ul>
+          {savingsAccounts.length === 0 && (
+            <p className="text-sm text-zinc-500 dark:text-zinc-500">No savings accounts opened yet.</p>
+          )}
+        </section>
+      )}
 
       <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
         <h2 className="font-semibold text-black dark:text-zinc-50">Compliance filings</h2>

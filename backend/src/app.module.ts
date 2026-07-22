@@ -10,6 +10,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { CooperativesModule } from './cooperatives/cooperatives.module';
 import { ComplianceModule } from './compliance/compliance.module';
+import { SavingsModule } from './savings/savings.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ComplianceModule } from './compliance/compliance.module';
     AuthModule,
     CooperativesModule,
     ComplianceModule,
+    SavingsModule,
   ],
   controllers: [AppController],
   providers: [

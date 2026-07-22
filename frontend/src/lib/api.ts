@@ -158,6 +158,52 @@ export interface ComplianceCooperative extends Cooperative {
   _count: { memberships: number; complianceFilings: number };
 }
 
+export interface SavingsProduct {
+  id: string;
+  cooperativeId: string;
+  name: string;
+  code: string;
+  interestRatePercent: string;
+  minimumBalance: string;
+  isActive: boolean;
+}
+
+export interface SavingsAccount {
+  id: string;
+  cooperativeId: string;
+  membershipId: string;
+  productId: string;
+  accountNumber: string;
+  balance: string;
+  status: string;
+  lastInterestAccrualAt: string | null;
+  openedAt: string;
+  product?: SavingsProduct;
+  membership?: { user: { id: string; email: string; firstName: string; lastName: string } };
+}
+
+export interface SavingsTransaction {
+  id: string;
+  accountId: string;
+  type: "DEPOSIT" | "WITHDRAWAL" | "INTEREST";
+  amount: string;
+  balanceAfter: string;
+  narration: string | null;
+  createdAt: string;
+}
+
+export interface SavingsReceipt {
+  transactionId: string;
+  type: string;
+  amount: string;
+  balanceAfter: string;
+  narration: string | null;
+  createdAt: string;
+  account: { accountNumber: string; product: string };
+  member: { firstName: string; lastName: string; email: string };
+  qrCodeDataUrl: string;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -440,6 +486,79 @@ export const api = {
     request<ComplianceFiling>(
       `/compliance/filings/${filingId}/review`,
       { method: "PATCH", body: JSON.stringify({ status, reviewNotes }) },
+      true,
+    ),
+
+  listSavingsProducts: (cooperativeId: string) =>
+    request<SavingsProduct[]>(`/cooperatives/${cooperativeId}/savings/products`, { method: "GET" }, true),
+
+  createSavingsProduct: (
+    cooperativeId: string,
+    data: { name: string; code: string; interestRatePercent?: number; minimumBalance?: number },
+  ) =>
+    request<SavingsProduct>(
+      `/cooperatives/${cooperativeId}/savings/products`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  updateSavingsProduct: (
+    cooperativeId: string,
+    productId: string,
+    data: Partial<{ name: string; interestRatePercent: number; minimumBalance: number; isActive: boolean }>,
+  ) =>
+    request<SavingsProduct>(
+      `/cooperatives/${cooperativeId}/savings/products/${productId}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      true,
+    ),
+
+  listSavingsAccountsForCooperative: (cooperativeId: string) =>
+    request<SavingsAccount[]>(`/cooperatives/${cooperativeId}/savings/accounts`, { method: "GET" }, true),
+
+  listSavingsAccountsForMember: (cooperativeId: string, userId: string) =>
+    request<SavingsAccount[]>(
+      `/cooperatives/${cooperativeId}/members/${userId}/savings/accounts`,
+      { method: "GET" },
+      true,
+    ),
+
+  openSavingsAccount: (cooperativeId: string, userId: string, data: { productId: string }) =>
+    request<SavingsAccount>(
+      `/cooperatives/${cooperativeId}/members/${userId}/savings/accounts`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  recordSavingsTransaction: (
+    cooperativeId: string,
+    accountId: string,
+    data: { type: "DEPOSIT" | "WITHDRAWAL"; amount: number; narration?: string },
+  ) =>
+    request<SavingsTransaction>(
+      `/cooperatives/${cooperativeId}/savings/accounts/${accountId}/transactions`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  listSavingsTransactions: (cooperativeId: string, accountId: string) =>
+    request<SavingsTransaction[]>(
+      `/cooperatives/${cooperativeId}/savings/accounts/${accountId}/transactions`,
+      { method: "GET" },
+      true,
+    ),
+
+  accrueSavingsInterest: (cooperativeId: string, accountId: string) =>
+    request<SavingsTransaction>(
+      `/cooperatives/${cooperativeId}/savings/accounts/${accountId}/accrue-interest`,
+      { method: "POST" },
+      true,
+    ),
+
+  getSavingsReceipt: (cooperativeId: string, accountId: string, transactionId: string) =>
+    request<SavingsReceipt>(
+      `/cooperatives/${cooperativeId}/savings/accounts/${accountId}/transactions/${transactionId}/receipt`,
+      { method: "GET" },
       true,
     ),
 };

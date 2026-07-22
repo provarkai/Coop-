@@ -11,8 +11,9 @@ See [`docs/PRD.md`](docs/PRD.md), [`docs/SDD.md`](docs/SDD.md), [`docs/ROADMAP.m
 - **Sprint 2 (Cooperative Management):** done. Cooperative creation (creator becomes `COOPERATIVE_ADMIN`), branches, committees with membership, per-cooperative membership with roles/status/category, by-laws and financial-year settings, and cooperative-scoped RBAC, with a matching Next.js UI (cooperative list/create/detail pages).
 - **Sprint 3 (Member Management):** done. Self-service membership applications with admin approval/rejection (auto-assigning a membership number), KYC profile fields (DOB, gender, phone, address, BVN, NIN), guarantor nomination with guarantor-side confirmation, beneficiaries, a digital membership card with a QR code, and an audit log of membership lifecycle events — with a matching Next.js UI (profile page, join-by-invite-link flow, pending-applications approval, member detail page with card/guarantors/beneficiaries, audit log view).
 - **Regulatory compliance (out-of-sequence addition):** done. A platform-wide `REGULATOR` role with read-only, cross-cooperative oversight (no membership required), plus a compliance-filing workflow — cooperatives submit filings (annual return, financial statement, AGM minutes, etc.), regulators review and approve/reject them. Includes a `SUPER_ADMIN`-only endpoint to promote a user's platform role (needed to bootstrap the first regulator) and a matching Next.js UI (regulator dashboard, admin user-role management, compliance-filings section on the cooperative page).
+- **Sprint 4 (Savings Engine):** done. Configurable savings products (interest rate, minimum balance), per-member savings accounts opened by governance/treasurer, deposit/withdrawal recording with minimum-balance enforcement, simple-interest accrual, account statements, and a QR-coded transaction receipt — with a matching Next.js UI (savings products, a self-service "My savings" view, and a governance-facing savings-accounts ledger on the cooperative page).
 
-See the Playbook for the remaining sprint sequence, starting with Sprint 4 (Savings Engine).
+See the Playbook for the remaining sprint sequence, starting with Sprint 5 (Loan Management).
 
 ## Structure
 
@@ -121,6 +122,18 @@ Cooperative-scoped RBAC is enforced by `@CooperativeRoles(...)` + `CooperativeRo
 | `PATCH /compliance/filings/:id/review` | Approve/reject a filing (can't re-review one already decided) |
 
 **Bootstrapping:** there's no admin yet to grant the first `SUPER_ADMIN`, so it must be set directly in the database (`UPDATE "User" SET role = 'SUPER_ADMIN' WHERE email = '...'`). From then on, use `PATCH /users/:id/role` (or the "Manage user roles" page) to promote further admins or regulators. Role changes are embedded in the JWT at login, so a promoted user must log in again before the new role takes effect.
+
+## Savings API
+
+| Endpoint | Description |
+| --- | --- |
+| `POST\|GET /cooperatives/:id/savings/products` | Create/list savings products (create is `COOPERATIVE_ADMIN`/`CHAIRMAN`/`TREASURER`; list is any active member) |
+| `PATCH /cooperatives/:id/savings/products/:productId` | Update a product's name, rate, minimum balance, or active flag |
+| `POST\|GET /cooperatives/:id/members/:userId/savings/accounts` | Open/list a member's savings accounts (open is governance/treasurer; list is self or governance/treasurer/auditor) |
+| `GET /cooperatives/:id/savings/accounts` | Cooperative-wide account ledger (`COOPERATIVE_ADMIN`/`CHAIRMAN`/`TREASURER`/`AUDITOR`) |
+| `POST\|GET /cooperatives/:id/savings/accounts/:accountId/transactions` | Record a deposit/withdrawal (governance/treasurer; withdrawals can't breach the product minimum balance) or list the account statement (self or governance/treasurer/auditor) |
+| `POST /cooperatives/:id/savings/accounts/:accountId/accrue-interest` | Post simple interest since the last accrual (governance/treasurer) |
+| `GET /cooperatives/:id/savings/accounts/:accountId/transactions/:transactionId/receipt` | QR-coded transaction receipt (self or governance/treasurer/auditor) |
 
 ## CI
 

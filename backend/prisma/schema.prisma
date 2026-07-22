@@ -3,6 +3,8 @@
 // Sprint 3: member KYC, onboarding/approval, guarantors, beneficiaries, audit log.
 // Regulatory compliance: a platform-wide REGULATOR role with cross-cooperative
 // oversight, and a compliance-filing submit/review workflow.
+// Sprint 4: savings products, member savings accounts, contributions/
+// withdrawals, and simple-interest accrual.
 
 generator client {
   provider = "prisma-client-js"
@@ -27,34 +29,35 @@ enum Role {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
+  id           String  @id @default(cuid())
+  email        String  @unique
   passwordHash String
   firstName    String
   lastName     String
-  role         Role      @default(MEMBER)
-  isActive     Boolean   @default(true)
+  role         Role    @default(MEMBER)
+  isActive     Boolean @default(true)
 
-  mfaEnabled   Boolean   @default(false)
-  mfaSecret    String?
+  mfaEnabled Boolean @default(false)
+  mfaSecret  String?
 
-  dateOfBirth  DateTime?
-  gender       String?
-  phone        String?
-  address      String?
-  bvn          String?
-  nin          String?
+  dateOfBirth DateTime?
+  gender      String?
+  phone       String?
+  address     String?
+  bvn         String?
+  nin         String?
 
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  refreshTokens          RefreshToken[]
-  passwordResetTokens    PasswordResetToken[]
-  cooperativeMemberships CooperativeMembership[]
-  committeeMemberships   CommitteeMember[]
-  guarantorFor           Guarantor[]
-  filingsSubmitted       ComplianceFiling[] @relation("FilingSubmitter")
-  filingsReviewed        ComplianceFiling[] @relation("FilingReviewer")
+  refreshTokens               RefreshToken[]
+  passwordResetTokens         PasswordResetToken[]
+  cooperativeMemberships      CooperativeMembership[]
+  committeeMemberships        CommitteeMember[]
+  guarantorFor                Guarantor[]
+  filingsSubmitted            ComplianceFiling[]      @relation("FilingSubmitter")
+  filingsReviewed             ComplianceFiling[]      @relation("FilingReviewer")
+  savingsTransactionsRecorded SavingsTransaction[]
 }
 
 model RefreshToken {
@@ -110,6 +113,8 @@ model Cooperative {
   memberships       CooperativeMembership[]
   auditLogs         AuditLog[]
   complianceFilings ComplianceFiling[]
+  savingsProducts   SavingsProduct[]
+  savingsAccounts   SavingsAccount[]
 }
 
 model Branch {
@@ -167,8 +172,9 @@ model CooperativeMembership {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  guarantors    Guarantor[]
-  beneficiaries Beneficiary[]
+  guarantors      Guarantor[]
+  beneficiaries   Beneficiary[]
+  savingsAccounts SavingsAccount[]
 
   @@unique([cooperativeId, userId])
   @@unique([cooperativeId, membershipNumber])
@@ -254,4 +260,70 @@ model ComplianceFiling {
 
   @@index([cooperativeId])
   @@index([status])
+}
+
+enum SavingsAccountStatus {
+  ACTIVE
+  DORMANT
+  CLOSED
+}
+
+enum SavingsTransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  INTEREST
+}
+
+model SavingsProduct {
+  id                  String      @id @default(cuid())
+  cooperativeId       String
+  cooperative         Cooperative @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  name                String
+  code                String
+  interestRatePercent Decimal     @default(0) @db.Decimal(5, 2)
+  minimumBalance      Decimal     @default(0) @db.Decimal(14, 2)
+  isActive            Boolean     @default(true)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  accounts SavingsAccount[]
+
+  @@unique([cooperativeId, code])
+}
+
+model SavingsAccount {
+  id                    String                @id @default(cuid())
+  cooperativeId         String
+  cooperative           Cooperative           @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  membershipId          String
+  membership            CooperativeMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  productId             String
+  product               SavingsProduct        @relation(fields: [productId], references: [id])
+  accountNumber         String
+  balance               Decimal               @default(0) @db.Decimal(14, 2)
+  status                SavingsAccountStatus  @default(ACTIVE)
+  lastInterestAccrualAt DateTime?
+  openedAt              DateTime              @default(now())
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  transactions SavingsTransaction[]
+
+  @@unique([cooperativeId, accountNumber])
+  @@index([membershipId])
+}
+
+model SavingsTransaction {
+  id               String                 @id @default(cuid())
+  accountId        String
+  account          SavingsAccount         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type             SavingsTransactionType
+  amount           Decimal                @db.Decimal(14, 2)
+  balanceAfter     Decimal                @db.Decimal(14, 2)
+  narration        String?
+  recordedByUserId String?
+  recordedBy       User?                  @relation(fields: [recordedByUserId], references: [id])
+  createdAt        DateTime               @default(now())
+
+  @@index([accountId])
 }

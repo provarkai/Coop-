@@ -83,7 +83,7 @@ export class AuthController {
 
   @Get('me')
   me(@CurrentUser() user: AuthenticatedUser) {
-    return user;
+    return this.authService.getMe(user.userId);
   }
 
   // Demonstrates RBAC: only Super Admins and Cooperative Admins may call this.
