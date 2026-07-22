@@ -31,7 +31,10 @@ import { RespondGuarantorDto } from './dto/respond-guarantor.dto';
 import { CreateBeneficiaryDto } from './dto/create-beneficiary.dto';
 import { UpdateBeneficiaryDto } from './dto/update-beneficiary.dto';
 import { CreateComplianceFilingDto } from './dto/create-compliance-filing.dto';
-import { MANAGE_GOVERNANCE_ROLES } from './roles.constants';
+import {
+  MANAGE_COOPERATIVE_ROLES,
+  MANAGE_GOVERNANCE_ROLES,
+} from './roles.constants';
 
 @Injectable()
 export class CooperativesService {
@@ -297,6 +300,15 @@ export class CooperativesService {
     if (!membership) {
       throw new NotFoundException('Membership not found');
     }
+    const governingRoles = MANAGE_COOPERATIVE_ROLES as readonly Role[];
+    await this.assertNotStrandingCooperative(
+      cooperativeId,
+      userId,
+      membership.status === MembershipStatus.ACTIVE &&
+        governingRoles.includes(membership.role),
+      (dto.status ?? membership.status) === MembershipStatus.ACTIVE &&
+        governingRoles.includes(dto.role ?? membership.role),
+    );
     const updated = await this.prisma.cooperativeMembership.update({
       where: { id: membership.id },
       data: dto,
@@ -325,6 +337,14 @@ export class CooperativesService {
     if (!membership) {
       throw new NotFoundException('Membership not found');
     }
+    const governingRoles = MANAGE_COOPERATIVE_ROLES as readonly Role[];
+    await this.assertNotStrandingCooperative(
+      cooperativeId,
+      userId,
+      membership.status === MembershipStatus.ACTIVE &&
+        governingRoles.includes(membership.role),
+      false,
+    );
     await this.prisma.cooperativeMembership.delete({
       where: { id: membership.id },
     });
@@ -835,6 +855,32 @@ export class CooperativesService {
       throw new NotFoundException('Committee not found');
     }
     return committee;
+  }
+
+  private async assertNotStrandingCooperative(
+    cooperativeId: string,
+    userId: string,
+    isCurrentlyGoverning: boolean,
+    willStillGovern: boolean,
+  ) {
+    if (!isCurrentlyGoverning || willStillGovern) {
+      return;
+    }
+
+    const governingRoles = MANAGE_COOPERATIVE_ROLES as readonly Role[];
+    const otherGoverningCount = await this.prisma.cooperativeMembership.count({
+      where: {
+        cooperativeId,
+        userId: { not: userId },
+        status: MembershipStatus.ACTIVE,
+        role: { in: governingRoles as Role[] },
+      },
+    });
+    if (otherGoverningCount === 0) {
+      throw new BadRequestException(
+        'Cannot remove the last active cooperative admin or chairman. Promote another member to that role first.',
+      );
+    }
   }
 
   private async assertMember(cooperativeId: string, user: AuthenticatedUser) {

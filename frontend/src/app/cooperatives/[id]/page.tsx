@@ -8,6 +8,7 @@ import {
   ApiError,
   getAccessToken,
   type AuditLogEntry,
+  type AuthUser,
   type Branch,
   type Committee,
   type ComplianceFiling,
@@ -37,6 +38,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
   const { id } = use(params);
   const router = useRouter();
 
+  const [me, setMe] = useState<AuthUser | null>(null);
   const [cooperative, setCooperative] = useState<Cooperative | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [committees, setCommittees] = useState<Committee[]>([]);
@@ -100,6 +102,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
     async function load() {
       setInviteLink(`${window.location.origin}/cooperatives/${id}/join`);
       try {
+        setMe(await api.me());
         await reload();
       } catch (err) {
         setLoadError(err instanceof ApiError ? err.message : "Something went wrong");
@@ -210,6 +213,16 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
   }
 
   async function onUpdateMemberRole(userId: string, role: string) {
+    if (userId === me?.id) {
+      const confirmed = window.confirm(
+        "You are changing your own role. If you remove your own governance access, you may lose the ability to manage this cooperative unless another admin or chairman remains. Continue?",
+      );
+      if (!confirmed) {
+        setMembers((prev) => [...prev]);
+        return;
+      }
+    }
+    setMemberError(null);
     try {
       await api.updateMembership(id, userId, { role });
       setMembers(await api.listMembers(id));

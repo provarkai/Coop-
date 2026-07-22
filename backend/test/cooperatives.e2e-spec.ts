@@ -239,6 +239,55 @@ describe('Cooperatives (e2e)', () => {
       .expect(403);
   });
 
+  it('refuses to let the sole cooperative admin demote or remove themselves', async () => {
+    const solo = await registerAndLogin(`solo-admin-${suffix}@example.com`);
+    const soloSlug = `solo-coop-${suffix}`;
+    const created = await request(app.getHttpServer())
+      .post('/cooperatives')
+      .set('Authorization', `Bearer ${solo.accessToken}`)
+      .send({ name: 'Solo Cooperative', slug: soloSlug })
+      .expect(201);
+    const soloCoopId = created.body.id;
+
+    await request(app.getHttpServer())
+      .patch(`/cooperatives/${soloCoopId}/members/${solo.userId}`)
+      .set('Authorization', `Bearer ${solo.accessToken}`)
+      .send({ role: 'MEMBER' })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .delete(`/cooperatives/${soloCoopId}/members/${solo.userId}`)
+      .set('Authorization', `Bearer ${solo.accessToken}`)
+      .expect(400);
+
+    await registerAndLogin(`second-admin-${suffix}@example.com`);
+    await request(app.getHttpServer())
+      .post(`/cooperatives/${soloCoopId}/members`)
+      .set('Authorization', `Bearer ${solo.accessToken}`)
+      .send({
+        email: `second-admin-${suffix}@example.com`,
+        role: 'COOPERATIVE_ADMIN',
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .patch(`/cooperatives/${soloCoopId}/members/${solo.userId}`)
+      .set('Authorization', `Bearer ${solo.accessToken}`)
+      .send({ role: 'MEMBER' })
+      .expect(200);
+
+    await prisma.user.deleteMany({
+      where: {
+        email: {
+          in: [
+            `solo-admin-${suffix}@example.com`,
+            `second-admin-${suffix}@example.com`,
+          ],
+        },
+      },
+    });
+  });
+
   it('deletes a branch', async () => {
     await request(app.getHttpServer())
       .delete(`/cooperatives/${cooperativeId}/branches/${branchId}`)
