@@ -11,6 +11,10 @@
 // Sprint 6: a simulated payment gateway for self-service savings
 // contributions and loan repayments, plus reconciliation/transaction
 // history reporting.
+// Sprint 7: double-entry accounting — a per-cooperative chart of
+// accounts, manual journal entries, automatic postings from savings/
+// loan activity, trial balance/income statement/balance sheet
+// reports, and simple per-account budgeting.
 
 generator client {
   provider = "prisma-client-js"
@@ -66,6 +70,7 @@ model User {
   savingsTransactionsRecorded SavingsTransaction[]
   loanGuarantorFor            LoanGuarantor[]
   loanLedgerEntriesRecorded   LoanLedgerEntry[]
+  journalEntriesPosted        JournalEntry[]
 }
 
 model RefreshToken {
@@ -126,6 +131,9 @@ model Cooperative {
   loanProducts      LoanProduct[]
   loans             Loan[]
   payments          Payment[]
+  accounts          Account[]
+  journalEntries    JournalEntry[]
+  budgets           Budget[]
 }
 
 model Branch {
@@ -491,4 +499,79 @@ model Payment {
 
   @@index([cooperativeId])
   @@index([membershipId])
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum JournalEntrySource {
+  MANUAL
+  SAVINGS
+  LOAN
+}
+
+model Account {
+  id            String      @id @default(cuid())
+  cooperativeId String
+  cooperative   Cooperative @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  code          String
+  name          String
+  type          AccountType
+  isSystem      Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  journalLines JournalLine[]
+  budgets      Budget[]
+
+  @@unique([cooperativeId, code])
+}
+
+model JournalEntry {
+  id             String             @id @default(cuid())
+  cooperativeId  String
+  cooperative    Cooperative        @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  date           DateTime           @default(now())
+  memo           String?
+  source         JournalEntrySource @default(MANUAL)
+  sourceId       String?            @unique
+  postedByUserId String?
+  postedBy       User?              @relation(fields: [postedByUserId], references: [id])
+  createdAt      DateTime           @default(now())
+
+  lines JournalLine[]
+
+  @@index([cooperativeId])
+}
+
+model JournalLine {
+  id             String       @id @default(cuid())
+  journalEntryId String
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  debit          Decimal      @default(0) @db.Decimal(14, 2)
+  credit         Decimal      @default(0) @db.Decimal(14, 2)
+
+  @@index([journalEntryId])
+  @@index([accountId])
+}
+
+model Budget {
+  id            String      @id @default(cuid())
+  cooperativeId String
+  cooperative   Cooperative @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  accountId     String
+  account       Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  period        String
+  plannedAmount Decimal     @db.Decimal(14, 2)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([accountId, period])
 }

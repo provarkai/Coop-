@@ -15,6 +15,7 @@ import {
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { AccountingService } from '../accounting/accounting.service';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { VIEW_SAVINGS_ROLES } from '../cooperatives/roles.constants';
 import { CreateSavingsProductDto } from './dto/create-savings-product.dto';
@@ -30,6 +31,7 @@ export class SavingsService {
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
     private readonly config: ConfigService,
+    private readonly accounting: AccountingService,
   ) {}
 
   async createProduct(cooperativeId: string, dto: CreateSavingsProductDto) {
@@ -212,6 +214,20 @@ export class SavingsService {
       metadata: { accountId: account.id, type: dto.type, amount: dto.amount },
     });
 
+    if (dto.type === 'DEPOSIT') {
+      await this.accounting.postSavingsDeposit(
+        cooperativeId,
+        dto.amount,
+        transaction.id,
+      );
+    } else {
+      await this.accounting.postSavingsWithdrawal(
+        cooperativeId,
+        dto.amount,
+        transaction.id,
+      );
+    }
+
     return transaction;
   }
 
@@ -270,6 +286,12 @@ export class SavingsService {
       targetId: transaction.id,
       metadata: { accountId: account.id, days, interest: interest.toString() },
     });
+
+    await this.accounting.postSavingsInterest(
+      cooperativeId,
+      interest.toNumber(),
+      transaction.id,
+    );
 
     return transaction;
   }

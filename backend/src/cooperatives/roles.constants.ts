@@ -49,3 +49,14 @@ export const VIEW_PAYMENT_ROLES = [
   Role.LOAN_OFFICER,
   Role.AUDITOR,
 ] as const;
+export const MANAGE_ACCOUNTING_ROLES = [
+  Role.COOPERATIVE_ADMIN,
+  Role.CHAIRMAN,
+  Role.TREASURER,
+] as const;
+export const VIEW_ACCOUNTING_ROLES = [
+  Role.COOPERATIVE_ADMIN,
+  Role.CHAIRMAN,
+  Role.TREASURER,
+  Role.AUDITOR,
+] as const;

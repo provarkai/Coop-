@@ -16,6 +16,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+import { AccountingService } from '../accounting/accounting.service';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { VIEW_LOAN_ROLES } from '../cooperatives/roles.constants';
 import { CreateLoanProductDto } from './dto/create-loan-product.dto';
@@ -31,6 +32,7 @@ export class LoansService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
+    private readonly accounting: AccountingService,
   ) {}
 
   async createProduct(cooperativeId: string, dto: CreateLoanProductDto) {
@@ -415,7 +417,7 @@ export class LoansService {
       });
     }
 
-    await this.prisma.$transaction([
+    const results = await this.prisma.$transaction([
       this.prisma.loan.update({
         where: { id: loanId },
         data: {
@@ -436,6 +438,13 @@ export class LoansService {
         },
       }),
     ]);
+    const ledgerEntry = results[2];
+
+    await this.accounting.postLoanDisbursement(
+      cooperativeId,
+      principal.toNumber(),
+      ledgerEntry.id,
+    );
 
     return this.getLoan(cooperativeId, loanId, actor);
   }
@@ -462,6 +471,8 @@ export class LoansService {
     });
 
     let remaining = payment;
+    let interestPortion = new Prisma.Decimal(0);
+    let principalPortion = new Prisma.Decimal(0);
     const updates: Prisma.PrismaPromise<unknown>[] = [];
     for (const installment of openInstallments) {
       if (remaining.lessThanOrEqualTo(0)) break;
@@ -484,6 +495,22 @@ export class LoansService {
             paidAt: fullyPaid ? new Date() : installment.paidAt,
           },
         }),
+      );
+      // Interest-first allocation, derived (not separately stored) so the
+      // split stays consistent across repeated partial repayments.
+      const interestPaidBefore = Prisma.Decimal.min(
+        installment.amountPaid,
+        installment.interestDue,
+      );
+      const interestPaidAfter = Prisma.Decimal.min(
+        newAmountPaid,
+        installment.interestDue,
+      );
+      const installmentInterestPortion =
+        interestPaidAfter.minus(interestPaidBefore);
+      interestPortion = interestPortion.plus(installmentInterestPortion);
+      principalPortion = principalPortion.plus(
+        applied.minus(installmentInterestPortion),
       );
       remaining = remaining.minus(applied);
     }
@@ -515,8 +542,19 @@ export class LoansService {
         },
       }),
     ]);
+    const ledgerEntry = results[results.length - 1] as {
+      id: string;
+      type: LoanLedgerEntryType;
+    };
 
-    return results[results.length - 1];
+    await this.accounting.postLoanRepayment(
+      cooperativeId,
+      principalPortion.toNumber(),
+      interestPortion.toNumber(),
+      ledgerEntry.id,
+    );
+
+    return ledgerEntry;
   }
 
   async assessPenalty(
@@ -587,8 +625,18 @@ export class LoansService {
         },
       }),
     ]);
+    const ledgerEntry = results[results.length - 1] as {
+      id: string;
+      type: LoanLedgerEntryType;
+    };
 
-    return results[results.length - 1];
+    await this.accounting.postLoanPenalty(
+      cooperativeId,
+      penalty.toNumber(),
+      ledgerEntry.id,
+    );
+
+    return ledgerEntry;
   }
 
   private async getProductOrThrow(cooperativeId: string, productId: string) {

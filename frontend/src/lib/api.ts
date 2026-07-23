@@ -283,6 +283,75 @@ export interface Payment {
   loan?: { id: string; product?: { name: string } };
 }
 
+export type AccountType = "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+
+export interface Account {
+  id: string;
+  cooperativeId: string;
+  code: string;
+  name: string;
+  type: AccountType;
+  isSystem: boolean;
+}
+
+export interface JournalLine {
+  id: string;
+  accountId: string;
+  debit: string;
+  credit: string;
+  account?: Account;
+}
+
+export interface JournalEntry {
+  id: string;
+  cooperativeId: string;
+  date: string;
+  memo: string | null;
+  source: "MANUAL" | "SAVINGS" | "LOAN";
+  sourceId: string | null;
+  createdAt: string;
+  lines: JournalLine[];
+  postedBy?: { id: string; email: string; firstName: string; lastName: string } | null;
+}
+
+export interface TrialBalanceRow {
+  account: Account;
+  totalDebit: string;
+  totalCredit: string;
+  balance: string;
+}
+
+export interface IncomeStatement {
+  income: TrialBalanceRow[];
+  expense: TrialBalanceRow[];
+  totalIncome: string;
+  totalExpense: string;
+  netSurplus: string;
+}
+
+export interface BalanceSheet {
+  assets: TrialBalanceRow[];
+  liabilities: TrialBalanceRow[];
+  equity: TrialBalanceRow[];
+  totalAssets: string;
+  totalLiabilities: string;
+  totalEquity: string;
+}
+
+export interface Budget {
+  id: string;
+  accountId: string;
+  period: string;
+  plannedAmount: string;
+  account?: Account;
+}
+
+export interface BudgetVsActual {
+  budget: Budget;
+  actual: string;
+  variance: string;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -761,6 +830,56 @@ export const api = {
     request<Payment>(
       `/cooperatives/${cooperativeId}/payments/${paymentId}/simulate-callback`,
       { method: "POST", body: JSON.stringify({ outcome }) },
+      true,
+    ),
+
+  listAccounts: (cooperativeId: string) =>
+    request<Account[]>(`/cooperatives/${cooperativeId}/accounting/accounts`, { method: "GET" }, true),
+
+  createAccount: (cooperativeId: string, data: { code: string; name: string; type: AccountType }) =>
+    request<Account>(
+      `/cooperatives/${cooperativeId}/accounting/accounts`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  createJournalEntry: (
+    cooperativeId: string,
+    data: { memo?: string; lines: { accountId: string; debit?: number; credit?: number }[] },
+  ) =>
+    request<JournalEntry>(
+      `/cooperatives/${cooperativeId}/accounting/journal-entries`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  listJournalEntries: (cooperativeId: string, accountId?: string) =>
+    request<JournalEntry[]>(
+      `/cooperatives/${cooperativeId}/accounting/journal-entries${accountId ? `?accountId=${accountId}` : ""}`,
+      { method: "GET" },
+      true,
+    ),
+
+  getTrialBalance: (cooperativeId: string) =>
+    request<TrialBalanceRow[]>(`/cooperatives/${cooperativeId}/accounting/trial-balance`, { method: "GET" }, true),
+
+  getIncomeStatement: (cooperativeId: string) =>
+    request<IncomeStatement>(`/cooperatives/${cooperativeId}/accounting/income-statement`, { method: "GET" }, true),
+
+  getBalanceSheet: (cooperativeId: string) =>
+    request<BalanceSheet>(`/cooperatives/${cooperativeId}/accounting/balance-sheet`, { method: "GET" }, true),
+
+  upsertBudget: (cooperativeId: string, data: { accountId: string; period: string; plannedAmount: number }) =>
+    request<Budget>(
+      `/cooperatives/${cooperativeId}/accounting/budgets`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  getBudgetVsActual: (cooperativeId: string, period?: string) =>
+    request<BudgetVsActual[]>(
+      `/cooperatives/${cooperativeId}/accounting/budgets${period ? `?period=${period}` : ""}`,
+      { method: "GET" },
       true,
     ),
 };

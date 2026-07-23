@@ -13,6 +13,7 @@ import { ComplianceModule } from './compliance/compliance.module';
 import { SavingsModule } from './savings/savings.module';
 import { LoansModule } from './loans/loans.module';
 import { PaymentsModule } from './payments/payments.module';
+import { AccountingModule } from './accounting/accounting.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { PaymentsModule } from './payments/payments.module';
     SavingsModule,
     LoansModule,
     PaymentsModule,
+    AccountingModule,
   ],
   controllers: [AppController],
   providers: [
