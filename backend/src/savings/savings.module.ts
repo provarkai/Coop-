@@ -7,5 +7,6 @@ import { SavingsService } from './savings.service';
   imports: [AuditLogModule],
   controllers: [SavingsController],
   providers: [SavingsService],
+  exports: [SavingsService],
 })
 export class SavingsModule {}

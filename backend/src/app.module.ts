@@ -12,6 +12,7 @@ import { CooperativesModule } from './cooperatives/cooperatives.module';
 import { ComplianceModule } from './compliance/compliance.module';
 import { SavingsModule } from './savings/savings.module';
 import { LoansModule } from './loans/loans.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { LoansModule } from './loans/loans.module';
     ComplianceModule,
     SavingsModule,
     LoansModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [

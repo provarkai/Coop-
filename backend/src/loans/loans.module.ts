@@ -7,5 +7,6 @@ import { LoansService } from './loans.service';
   imports: [UsersModule],
   controllers: [LoansController],
   providers: [LoansService],
+  exports: [LoansService],
 })
 export class LoansModule {}

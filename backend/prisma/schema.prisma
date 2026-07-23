@@ -8,6 +8,9 @@
 // Sprint 5: loan products, applications, guarantor sign-off, approval,
 // disbursement with a generated repayment schedule, repayments, and
 // late-payment penalty assessment.
+// Sprint 6: a simulated payment gateway for self-service savings
+// contributions and loan repayments, plus reconciliation/transaction
+// history reporting.
 
 generator client {
   provider = "prisma-client-js"
@@ -122,6 +125,7 @@ model Cooperative {
   savingsAccounts   SavingsAccount[]
   loanProducts      LoanProduct[]
   loans             Loan[]
+  payments          Payment[]
 }
 
 model Branch {
@@ -183,6 +187,7 @@ model CooperativeMembership {
   beneficiaries   Beneficiary[]
   savingsAccounts SavingsAccount[]
   loans           Loan[]
+  payments        Payment[]
 
   @@unique([cooperativeId, userId])
   @@unique([cooperativeId, membershipNumber])
@@ -316,6 +321,7 @@ model SavingsAccount {
   updatedAt             DateTime              @updatedAt
 
   transactions SavingsTransaction[]
+  payments     Payment[]
 
   @@unique([cooperativeId, accountNumber])
   @@index([membershipId])
@@ -403,6 +409,7 @@ model Loan {
   guarantors LoanGuarantor[]
   schedule   RepaymentInstallment[]
   ledger     LoanLedgerEntry[]
+  payments   Payment[]
 
   @@index([cooperativeId])
   @@index([membershipId])
@@ -450,4 +457,38 @@ model LoanLedgerEntry {
   createdAt        DateTime            @default(now())
 
   @@index([loanId])
+}
+
+enum PaymentPurpose {
+  SAVINGS_DEPOSIT
+  LOAN_REPAYMENT
+}
+
+enum PaymentStatus {
+  INITIATED
+  SUCCESS
+  FAILED
+}
+
+model Payment {
+  id               String                @id @default(cuid())
+  cooperativeId    String
+  cooperative      Cooperative           @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  membershipId     String
+  membership       CooperativeMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  purpose          PaymentPurpose
+  savingsAccountId String?
+  savingsAccount   SavingsAccount?       @relation(fields: [savingsAccountId], references: [id])
+  loanId           String?
+  loan             Loan?                 @relation(fields: [loanId], references: [id])
+  amount           Decimal               @db.Decimal(14, 2)
+  gatewayReference String                @unique
+  status           PaymentStatus         @default(INITIATED)
+  narration        String?
+  completedAt      DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@index([cooperativeId])
+  @@index([membershipId])
 }

@@ -265,6 +265,24 @@ export interface Loan {
   ledger?: LoanLedgerEntry[];
 }
 
+export interface Payment {
+  id: string;
+  cooperativeId: string;
+  membershipId: string;
+  purpose: "SAVINGS_DEPOSIT" | "LOAN_REPAYMENT";
+  savingsAccountId: string | null;
+  loanId: string | null;
+  amount: string;
+  gatewayReference: string;
+  status: "INITIATED" | "SUCCESS" | "FAILED";
+  narration: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  membership?: { user: { id: string; email: string; firstName: string; lastName: string } };
+  savingsAccount?: { accountNumber: string; product?: { name: string } };
+  loan?: { id: string; product?: { name: string } };
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -722,4 +740,27 @@ export const api = {
 
   assessLoanPenalty: (cooperativeId: string, loanId: string) =>
     request<LoanLedgerEntry>(`/cooperatives/${cooperativeId}/loans/${loanId}/assess-penalty`, { method: "POST" }, true),
+
+  initiatePayment: (
+    cooperativeId: string,
+    data: { purpose: "SAVINGS_DEPOSIT" | "LOAN_REPAYMENT"; targetId: string; amount: number; narration?: string },
+  ) =>
+    request<Payment>(`/cooperatives/${cooperativeId}/payments`, { method: "POST", body: JSON.stringify(data) }, true),
+
+  listPaymentsForCooperative: (cooperativeId: string, status?: string) =>
+    request<Payment[]>(
+      `/cooperatives/${cooperativeId}/payments${status ? `?status=${status}` : ""}`,
+      { method: "GET" },
+      true,
+    ),
+
+  listPaymentsForMember: (cooperativeId: string, userId: string) =>
+    request<Payment[]>(`/cooperatives/${cooperativeId}/members/${userId}/payments`, { method: "GET" }, true),
+
+  simulatePaymentCallback: (cooperativeId: string, paymentId: string, outcome: "SUCCESS" | "FAILED") =>
+    request<Payment>(
+      `/cooperatives/${cooperativeId}/payments/${paymentId}/simulate-callback`,
+      { method: "POST", body: JSON.stringify({ outcome }) },
+      true,
+    ),
 };
