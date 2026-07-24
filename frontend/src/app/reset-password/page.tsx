@@ -50,6 +50,7 @@ function ResetPasswordForm() {
         type="password"
         autoComplete="new-password"
         placeholder="New password (min. 8 characters)"
+        aria-label="New password (minimum 8 characters)"
         value={newPassword}
         onChange={(e) => setNewPassword(e.target.value)}
         minLength={8}

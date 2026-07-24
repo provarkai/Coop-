@@ -49,6 +49,7 @@ export default function LoginPage() {
           type="email"
           autoComplete="username"
           placeholder="Email"
+          aria-label="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -59,6 +60,7 @@ export default function LoginPage() {
           type="password"
           autoComplete="current-password"
           placeholder="Password"
+          aria-label="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
@@ -68,6 +70,7 @@ export default function LoginPage() {
           <input
             className="w-full rounded-md border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
             placeholder="6-digit authenticator code"
+            aria-label="6-digit authenticator code"
             value={mfaCode}
             onChange={(e) => setMfaCode(e.target.value)}
             maxLength={6}

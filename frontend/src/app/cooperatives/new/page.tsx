@@ -48,6 +48,7 @@ export default function NewCooperativePage() {
         <input
           className="w-full rounded-md border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
           placeholder="Cooperative name"
+          aria-label="Cooperative name"
           value={name}
           onChange={(e) => {
             setName(e.target.value);
@@ -59,6 +60,7 @@ export default function NewCooperativePage() {
         <input
           className="w-full rounded-md border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
           placeholder="url-slug"
+          aria-label="URL slug"
           value={slug}
           onChange={(e) => {
             setSlug(e.target.value);

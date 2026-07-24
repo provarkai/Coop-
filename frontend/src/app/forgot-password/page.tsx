@@ -40,6 +40,7 @@ export default function ForgotPasswordPage() {
           type="email"
           autoComplete="username"
           placeholder="Email"
+          aria-label="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required

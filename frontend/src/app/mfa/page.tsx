@@ -101,6 +101,7 @@ export default function MfaPage() {
         <input
           className="w-full rounded-md border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
           placeholder="6-digit authenticator code"
+          aria-label="6-digit authenticator code"
           value={code}
           onChange={(e) => setCode(e.target.value)}
           maxLength={6}

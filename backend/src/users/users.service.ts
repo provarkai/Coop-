@@ -51,6 +51,7 @@ export class UsersService {
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
+      take: 1000,
     });
   }
 

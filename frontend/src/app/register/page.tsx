@@ -43,6 +43,7 @@ export default function RegisterPage() {
           <input
             className="w-1/2 rounded-md border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
             placeholder="First name"
+            aria-label="First name"
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
             required
@@ -50,6 +51,7 @@ export default function RegisterPage() {
           <input
             className="w-1/2 rounded-md border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
             placeholder="Last name"
+            aria-label="Last name"
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
             required
@@ -61,6 +63,7 @@ export default function RegisterPage() {
           type="email"
           autoComplete="username"
           placeholder="Email"
+          aria-label="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -71,6 +74,7 @@ export default function RegisterPage() {
           type="password"
           autoComplete="new-password"
           placeholder="Password (min. 8 characters)"
+          aria-label="Password (minimum 8 characters)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           minLength={8}

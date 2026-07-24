@@ -22,6 +22,7 @@ export class ComplianceService {
         _count: { select: { memberships: true, complianceFilings: true } },
       },
       orderBy: { name: 'asc' },
+      take: 1000,
     });
   }
 
@@ -35,6 +36,7 @@ export class ComplianceService {
         },
       },
       orderBy: { createdAt: 'desc' },
+      take: 1000,
     });
   }
 
