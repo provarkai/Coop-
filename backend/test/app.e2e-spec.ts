@@ -23,6 +23,13 @@ describe('AppController (e2e)', () => {
       .expect('Hello World!');
   });
 
+  it('/health (GET) reports ok with a working database', async () => {
+    const res = await request(app.getHttpServer()).get('/health').expect(200);
+    expect(res.body.status).toBe('ok');
+    expect(res.body.database).toBe('ok');
+    expect(typeof res.body.uptimeSeconds).toBe('number');
+  });
+
   afterEach(async () => {
     await app.close();
   });
