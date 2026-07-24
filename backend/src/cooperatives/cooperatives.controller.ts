@@ -8,8 +8,10 @@ import {
   Param,
   Patch,
   Post,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { CooperativesService } from './cooperatives.service';
@@ -213,6 +215,26 @@ export class CooperativesController {
     @CurrentUser() requester: AuthenticatedUser,
   ) {
     return this.cooperatives.getMembershipCard(id, userId, requester);
+  }
+
+  @Get(':id/members/:userId/card.pdf')
+  async getMembershipCardPdf(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @CurrentUser() requester: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.cooperatives.getMembershipCardPdf(
+      id,
+      userId,
+      requester,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="membership-card.pdf"',
+    );
+    res.send(pdf);
   }
 
   @Post(':id/members/:userId/guarantors')

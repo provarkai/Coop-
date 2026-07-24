@@ -6,7 +6,9 @@ import Link from "next/link";
 import {
   api,
   ApiError,
+  downloadFile,
   getAccessToken,
+  saveBlob,
   type Beneficiary,
   type Guarantor,
   type MembershipCard,
@@ -92,6 +94,15 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
     }
   }
 
+  async function onDownloadCardPdf() {
+    try {
+      const blob = await downloadFile(`/cooperatives/${id}/members/${userId}/card.pdf`);
+      saveBlob(blob, "membership-card.pdf");
+    } catch (err) {
+      setLoadError(err instanceof ApiError ? err.message : "Something went wrong");
+    }
+  }
+
   async function onRemoveBeneficiary(beneficiaryId: string) {
     try {
       await api.removeBeneficiary(id, userId, beneficiaryId);
@@ -139,6 +150,13 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
         <p className="text-sm text-zinc-500 dark:text-zinc-500">
           {card.role} · {card.category}
         </p>
+        <button
+          type="button"
+          onClick={() => void onDownloadCardPdf()}
+          className="rounded-full border border-black/[.08] px-4 py-1.5 text-sm font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+        >
+          Download PDF
+        </button>
       </section>
 
       <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">

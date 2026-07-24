@@ -414,6 +414,37 @@ export interface Meeting {
   resolutions?: Resolution[];
 }
 
+export type DocumentCategory = "BYLAWS" | "POLICY" | "FINANCIAL_STATEMENT" | "MEETING_MINUTES" | "FORM" | "OTHER";
+
+export interface DocumentMetadata {
+  id: string;
+  cooperativeId: string;
+  uploadedByUserId: string;
+  title: string;
+  category: DocumentCategory;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+  uploadedBy?: { id: string; email: string; firstName: string; lastName: string };
+}
+
+export type NotificationChannel = "EMAIL" | "SMS" | "WHATSAPP" | "PUSH";
+export type NotificationStatus = "SENT" | "FAILED";
+
+export interface AppNotification {
+  id: string;
+  cooperativeId: string | null;
+  recipientUserId: string;
+  channel: NotificationChannel;
+  subject: string | null;
+  body: string;
+  status: NotificationStatus;
+  sentByUserId: string | null;
+  createdAt: string;
+  recipient?: { id: string; email: string; firstName: string; lastName: string };
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -1036,4 +1067,57 @@ export const api = {
       { method: "POST" },
       true,
     ),
+
+  uploadDocument: (
+    cooperativeId: string,
+    data: { title: string; category?: DocumentCategory; fileName: string; mimeType: string; contentBase64: string },
+  ) =>
+    request<DocumentMetadata>(
+      `/cooperatives/${cooperativeId}/documents`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  listDocuments: (cooperativeId: string) =>
+    request<DocumentMetadata[]>(`/cooperatives/${cooperativeId}/documents`, { method: "GET" }, true),
+
+  deleteDocument: (cooperativeId: string, documentId: string) =>
+    request<void>(`/cooperatives/${cooperativeId}/documents/${documentId}`, { method: "DELETE" }, true),
+
+  sendAnnouncement: (
+    cooperativeId: string,
+    data: { channel: NotificationChannel; subject?: string; body: string },
+  ) =>
+    request<AppNotification[]>(
+      `/cooperatives/${cooperativeId}/notifications/announcements`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  listMyNotifications: (cooperativeId: string) =>
+    request<AppNotification[]>(`/cooperatives/${cooperativeId}/notifications`, { method: "GET" }, true),
+
+  listAllNotifications: (cooperativeId: string) =>
+    request<AppNotification[]>(`/cooperatives/${cooperativeId}/notifications/all`, { method: "GET" }, true),
 };
+
+/** Fetches a binary file (PDF, document download) with the auth header attached, for triggering a browser save-as. */
+export async function downloadFile(path: string): Promise<Blob> {
+  const headers = new Headers();
+  const token = getAccessToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const res = await fetch(`${API_URL}${path}`, { headers });
+  if (!res.ok) {
+    throw new ApiError("Download failed", res.status);
+  }
+  return res.blob();
+}
+
+export function saveBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}

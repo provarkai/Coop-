@@ -35,6 +35,7 @@ import {
   MANAGE_COOPERATIVE_ROLES,
   MANAGE_GOVERNANCE_ROLES,
 } from './roles.constants';
+import { PdfService } from '../pdf/pdf.service';
 
 @Injectable()
 export class CooperativesService {
@@ -43,6 +44,7 @@ export class CooperativesService {
     private readonly users: UsersService,
     private readonly auditLog: AuditLogService,
     private readonly config: ConfigService,
+    private readonly pdf: PdfService,
   ) {}
 
   async create(creator: AuthenticatedUser, dto: CreateCooperativeDto) {
@@ -492,6 +494,23 @@ export class CooperativesService {
       },
       qrCodeDataUrl,
     };
+  }
+
+  async getMembershipCardPdf(
+    cooperativeId: string,
+    userId: string,
+    requester: AuthenticatedUser,
+  ) {
+    const card = await this.getMembershipCard(cooperativeId, userId, requester);
+    return this.pdf.generateMembershipCardPdf({
+      cooperativeName: card.cooperative.name,
+      memberName: `${card.member.firstName} ${card.member.lastName}`,
+      membershipNumber: card.membershipNumber,
+      role: card.role,
+      category: card.category,
+      joinedAt: new Date(card.joinedAt),
+      qrCodeDataUrl: card.qrCodeDataUrl,
+    });
   }
 
   async addGuarantor(

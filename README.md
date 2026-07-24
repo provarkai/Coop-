@@ -16,8 +16,9 @@ See [`docs/PRD.md`](docs/PRD.md), [`docs/SDD.md`](docs/SDD.md), [`docs/ROADMAP.m
 - **Sprint 6 (Payments):** done. A simulated payment gateway (no real money movement or provider keys) for self-service savings contributions and loan repayments — a member initiates a payment against their own savings account or active loan, then a "callback" (simulated here in place of a real gateway webhook, triggerable by the payer or by governance) settles it, applying the deposit/repayment automatically on success or leaving the ledger untouched on failure. Includes cooperative-wide reconciliation (filterable by status) and per-member transaction history — with a matching Next.js UI ("Make a payment", "My payments", and a governance-facing reconciliation ledger).
 - **Sprint 7 (Accounting):** done. A double-entry ledger — a per-cooperative chart of accounts (auto-seeded with cash, member savings, loans receivable, interest/penalty income, and savings interest expense), manual journal entries (must balance debits and credits), and automatic postings from savings and loan activity (deposits/withdrawals/interest against cash and member savings; disbursements against loans receivable; repayments split into principal and interest portions; penalties against penalty income) so the books stay in sync with the rest of the app without extra data entry. Includes trial balance, income statement, and balance sheet reports, plus simple per-account/period budgeting with variance reporting — with a matching Next.js UI (chart of accounts, journal entries with a manual-entry form, trial balance, income statement, balance sheet, and budgets).
 - **Sprint 8 (Meetings & Governance):** done. Meeting scheduling (AGM/board/committee/special) with an ordered agenda, auto-inviting every active member as an attendee; self-service RSVP and governance-recorded attendance; member-proposed resolutions (optionally tied to an agenda item) with one vote per member (FOR/AGAINST/ABSTAIN, changeable while open), governance tallying on close (FOR > AGAINST passes, ties and everything else reject), and withdrawal by the proposer or governance; meeting minutes recording, which marks the meeting COMPLETED — with a matching Next.js UI. All meeting times are entered and displayed in West Africa Time (WAT, UTC+1, Nigeria has no DST) regardless of the viewer's own timezone.
+- **Sprint 9 (Documents & Communication):** done. A per-cooperative document repository (arbitrary files uploaded and stored as bytes with metadata — title, category, uploader — download returns the exact original bytes with the right filename/content-type); real, on-demand-generated PDFs for the membership card and meeting minutes (no external service — rendered server-side with `pdfkit`); and a multi-channel notification log (email/SMS/WhatsApp/push) for governance announcements broadcast to every active member, plus an automatic (simulated) email notice to every invited member when a meeting is scheduled. Email/SMS/WhatsApp/push sends are **simulated** — no real provider credentials, every attempt is just logged as `SENT` — with a matching Next.js UI (document upload/list/download/delete, an announcement composer, a personal notification log, and "Download PDF" buttons on the membership card and meeting detail views).
 
-See the Playbook for the remaining sprint sequence, starting with Sprint 9 (Documents & Communication).
+See the Playbook for the remaining sprint sequence, starting with Sprint 10 (Reports & Dashboards).
 
 ## Structure
 
@@ -206,6 +207,24 @@ Scheduling, updating, recording minutes, and recording another member's attendan
 | `POST /cooperatives/:id/meetings/:meetingId/resolutions/:resolutionId/vote` | Cast or change a vote (`FOR`/`AGAINST`/`ABSTAIN`) — one per active member while the resolution is `PROPOSED` |
 | `POST /cooperatives/:id/meetings/:meetingId/resolutions/:resolutionId/close` | Tally votes and close — `FOR` > `AGAINST` passes, otherwise (including ties) rejects |
 | `POST /cooperatives/:id/meetings/:meetingId/resolutions/:resolutionId/withdraw` | Withdraw a still-open resolution (proposer or governance) |
+| `GET /cooperatives/:id/meetings/:meetingId/minutes.pdf` | Real, on-demand-generated PDF of the meeting (agenda, resolutions with vote tallies, minutes) — any active member |
+
+## Documents & Communication API
+
+Uploading and deleting documents, and sending announcements, are restricted to `COOPERATIVE_ADMIN`/`CHAIRMAN`/`SECRETARY`. Viewing/downloading documents and viewing one's own notification log are open to any active member. Email/SMS/WhatsApp/push are **simulated** — no real provider is called, every attempt is just recorded as `SENT`.
+
+| Endpoint | Description |
+| --- | --- |
+| `POST /cooperatives/:id/documents` | Upload a document — JSON body with base64-encoded content (title, category, file name, MIME type) |
+| `GET /cooperatives/:id/documents` | List document metadata (no content) for the cooperative (any active member) |
+| `GET /cooperatives/:id/documents/:documentId` | Download the original file bytes with the correct `Content-Type`/`Content-Disposition` (any active member) |
+| `DELETE /cooperatives/:id/documents/:documentId` | Delete a document |
+| `GET /cooperatives/:id/members/:userId/card.pdf` | Real, on-demand-generated PDF of the digital membership card (self or governance) |
+| `POST /cooperatives/:id/notifications/announcements` | Broadcast a message on a chosen channel (`EMAIL`/`SMS`/`WHATSAPP`/`PUSH`) to every active member (simulated send, logged as `SENT`) |
+| `GET /cooperatives/:id/notifications` | List the requester's own received notifications |
+| `GET /cooperatives/:id/notifications/all` | List every notification sent within the cooperative |
+
+Scheduling a meeting automatically sends a simulated `EMAIL` notification to every invited member (see `MeetingsService.createMeeting` in `backend/src/meetings/meetings.service.ts`).
 
 ## CI
 

@@ -18,6 +18,11 @@
 // Sprint 8: meeting scheduling with agendas, member RSVP and
 // governance-recorded attendance, resolutions with member voting and
 // governance tallying, and meeting minutes.
+// Sprint 9: a per-cooperative document repository (arbitrary files stored
+// as bytes, with metadata), and a simulated multi-channel notification
+// log (email/SMS/WhatsApp/push) used for governance announcements and
+// automatic meeting-invite notices. PDF generation (membership cards,
+// meeting minutes) is computed on demand and not persisted.
 
 generator client {
   provider = "prisma-client-js"
@@ -78,6 +83,9 @@ model User {
   meetingMinutesRecorded      Meeting[]               @relation("MeetingMinutesRecorder")
   meetingAttendances          Attendance[]
   resolutionsProposed         Resolution[]            @relation("ResolutionProposer")
+  documentsUploaded           Document[]              @relation("DocumentUploader")
+  notificationsReceived       Notification[]          @relation("NotificationRecipient")
+  notificationsSent           Notification[]          @relation("NotificationSender")
 }
 
 model RefreshToken {
@@ -142,6 +150,8 @@ model Cooperative {
   journalEntries    JournalEntry[]
   budgets           Budget[]
   meetings          Meeting[]
+  documents         Document[]
+  notifications     Notification[]
 }
 
 model Branch {
@@ -702,4 +712,60 @@ model Vote {
   updatedAt    DateTime              @updatedAt
 
   @@unique([resolutionId, membershipId])
+}
+
+enum DocumentCategory {
+  BYLAWS
+  POLICY
+  FINANCIAL_STATEMENT
+  MEETING_MINUTES
+  FORM
+  OTHER
+}
+
+model Document {
+  id               String           @id @default(cuid())
+  cooperativeId    String
+  cooperative      Cooperative      @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  uploadedByUserId String
+  uploadedBy       User             @relation("DocumentUploader", fields: [uploadedByUserId], references: [id])
+  title            String
+  category         DocumentCategory @default(OTHER)
+  fileName         String
+  mimeType         String
+  sizeBytes        Int
+  content          Bytes
+  createdAt        DateTime         @default(now())
+
+  @@index([cooperativeId])
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+  PUSH
+}
+
+enum NotificationStatus {
+  SENT
+  FAILED
+}
+
+model Notification {
+  id              String              @id @default(cuid())
+  cooperativeId   String?
+  cooperative     Cooperative?        @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  recipientUserId String
+  recipient       User                @relation("NotificationRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  channel         NotificationChannel
+  subject         String?
+  body            String
+  status          NotificationStatus  @default(SENT)
+  sentByUserId    String?
+  sentBy          User?               @relation("NotificationSender", fields: [sentByUserId], references: [id])
+  createdAt       DateTime            @default(now())
+
+  @@index([cooperativeId])
+  @@index([recipientUserId])
 }

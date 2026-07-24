@@ -5,8 +5,10 @@ import {
   Param,
   Patch,
   Post,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { CooperativeRoles } from '../cooperatives/decorators/cooperative-roles.decorator';
@@ -51,6 +53,22 @@ export class MeetingsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.meetings.getMeeting(id, meetingId, user);
+  }
+
+  @Get(':id/meetings/:meetingId/minutes.pdf')
+  async getMinutesPdf(
+    @Param('id') id: string,
+    @Param('meetingId') meetingId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.meetings.generateMinutesPdf(id, meetingId, user);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="meeting-minutes.pdf"',
+    );
+    res.send(pdf);
   }
 
   @CooperativeRoles(...MANAGE_GOVERNANCE_ROLES)

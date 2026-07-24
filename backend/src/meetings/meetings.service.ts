@@ -8,12 +8,15 @@ import {
   AttendanceStatus,
   MembershipStatus,
   MeetingStatus,
+  NotificationChannel,
   ResolutionStatus,
   Role,
   VoteChoice,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { PdfService } from '../pdf/pdf.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { MANAGE_GOVERNANCE_ROLES } from '../cooperatives/roles.constants';
 import { CreateMeetingDto } from './dto/create-meeting.dto';
@@ -48,6 +51,8 @@ export class MeetingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
+    private readonly pdf: PdfService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async createMeeting(
@@ -93,6 +98,19 @@ export class MeetingsService {
       metadata: { title: meeting.title },
     });
 
+    await Promise.all(
+      activeMembers.map((m) =>
+        this.notifications.send({
+          cooperativeId,
+          recipientUserId: m.userId,
+          channel: NotificationChannel.EMAIL,
+          subject: `Meeting invitation: ${meeting.title}`,
+          body: `You are invited to "${meeting.title}" (${meeting.type}) on ${meeting.scheduledAt.toISOString()}${meeting.location ? ` at ${meeting.location}` : ''}.`,
+          sentByUserId: actor.userId,
+        }),
+      ),
+    );
+
     return meeting;
   }
 
@@ -112,6 +130,39 @@ export class MeetingsService {
   ) {
     await this.assertMember(cooperativeId, user);
     return this.getMeetingOrThrow(cooperativeId, meetingId);
+  }
+
+  async generateMinutesPdf(
+    cooperativeId: string,
+    meetingId: string,
+    user: AuthenticatedUser,
+  ) {
+    await this.assertMember(cooperativeId, user);
+    const meeting = await this.getMeetingOrThrow(cooperativeId, meetingId);
+    const cooperative = await this.getCooperativeOrThrow(cooperativeId);
+
+    return this.pdf.generateMeetingMinutesPdf({
+      cooperativeName: cooperative.name,
+      meetingTitle: meeting.title,
+      meetingType: meeting.type,
+      scheduledAt: meeting.scheduledAt,
+      location: meeting.location,
+      agendaItems: meeting.agendaItems.map((item) => ({
+        order: item.order,
+        title: item.title,
+        description: item.description,
+      })),
+      resolutions: meeting.resolutions.map((r) => ({
+        title: r.title,
+        status: r.status,
+        forCount: r.votes.filter((v) => v.choice === VoteChoice.FOR).length,
+        againstCount: r.votes.filter((v) => v.choice === VoteChoice.AGAINST)
+          .length,
+        abstainCount: r.votes.filter((v) => v.choice === VoteChoice.ABSTAIN)
+          .length,
+      })),
+      minutes: meeting.minutes,
+    });
   }
 
   async updateMeeting(

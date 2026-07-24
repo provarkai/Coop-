@@ -15,6 +15,8 @@ import { LoansModule } from './loans/loans.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AccountingModule } from './accounting/accounting.module';
 import { MeetingsModule } from './meetings/meetings.module';
+import { DocumentsModule } from './documents/documents.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { MeetingsModule } from './meetings/meetings.module';
     PaymentsModule,
     AccountingModule,
     MeetingsModule,
+    DocumentsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [

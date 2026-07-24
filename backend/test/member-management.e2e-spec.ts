@@ -156,6 +156,22 @@ describe('Member management (e2e)', () => {
       .expect(403);
   });
 
+  it('generates a downloadable PDF version of the membership card', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/cooperatives/${cooperativeId}/members/${applicantId}/card.pdf`)
+      .set('Authorization', `Bearer ${applicantToken}`)
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk: Buffer) => chunks.push(chunk));
+        response.on('end', () => callback(null, Buffer.concat(chunks)));
+      })
+      .expect(200);
+
+    expect(res.headers['content-type']).toBe('application/pdf');
+    expect((res.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
+  });
+
   it('lets the member nominate a guarantor, who must confirm before it counts', async () => {
     const nomination = await request(app.getHttpServer())
       .post(`/cooperatives/${cooperativeId}/members/${applicantId}/guarantors`)

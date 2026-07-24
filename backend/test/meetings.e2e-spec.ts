@@ -424,4 +424,34 @@ describe('Meetings & Governance (e2e)', () => {
       'Budget ratified; treasurer election deferred.',
     );
   });
+
+  it('generates a downloadable PDF of the meeting minutes for any active member', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/cooperatives/${cooperativeId}/meetings/${meetingId}/minutes.pdf`)
+      .set('Authorization', `Bearer ${memberOneToken}`)
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk: Buffer) => chunks.push(chunk));
+        response.on('end', () => callback(null, Buffer.concat(chunks)));
+      })
+      .expect(200);
+
+    expect(res.headers['content-type']).toBe('application/pdf');
+    expect((res.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
+  });
+
+  it('auto-notifies every invited member by (simulated) email when a meeting is created', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/cooperatives/${cooperativeId}/notifications`)
+      .set('Authorization', `Bearer ${memberOneToken}`)
+      .expect(200);
+
+    const invite = res.body.find((n: { subject: string | null }) =>
+      n.subject?.includes('AGM 2026'),
+    );
+    expect(invite).toBeDefined();
+    expect(invite.channel).toBe('EMAIL');
+    expect(invite.status).toBe('SENT');
+  });
 });

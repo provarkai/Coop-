@@ -4,6 +4,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import {
   api,
   ApiError,
+  downloadFile,
+  saveBlob,
   type AuthUser,
   type Meeting,
   type MeetingType,
@@ -220,6 +222,17 @@ export default function MeetingsSection({ cooperativeId, me }: { cooperativeId: 
       await api.recordMeetingMinutes(cooperativeId, selectedMeeting.id, minutesDraft);
       await refreshSelected();
       await reload();
+    } catch (err) {
+      setMinutesError(err instanceof ApiError ? err.message : "Something went wrong");
+    }
+  }
+
+  async function onDownloadMinutesPdf() {
+    if (!selectedMeeting) return;
+    setMinutesError(null);
+    try {
+      const blob = await downloadFile(`/cooperatives/${cooperativeId}/meetings/${selectedMeeting.id}/minutes.pdf`);
+      saveBlob(blob, `${selectedMeeting.title}-minutes.pdf`);
     } catch (err) {
       setMinutesError(err instanceof ApiError ? err.message : "Something went wrong");
     }
@@ -498,7 +511,16 @@ export default function MeetingsSection({ cooperativeId, me }: { cooperativeId: 
           </div>
 
           <div>
-            <h3 className="text-sm font-medium text-black dark:text-zinc-50">Minutes</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-black dark:text-zinc-50">Minutes</h3>
+              <button
+                type="button"
+                onClick={() => void onDownloadMinutesPdf()}
+                className="rounded-full border border-black/[.08] px-3 py-1 text-xs dark:border-white/[.145]"
+              >
+                Download PDF
+              </button>
+            </div>
             <ErrorText message={minutesError} />
             {selectedMeeting.minutes && (
               <p className="whitespace-pre-wrap pt-1 text-sm text-zinc-500">{selectedMeeting.minutes}</p>
