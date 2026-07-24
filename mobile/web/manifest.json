@@ -1,11 +1,11 @@
 {
-    "name": "ncms_mobile",
-    "short_name": "ncms_mobile",
+    "name": "NCMS",
+    "short_name": "NCMS",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#166534",
+    "theme_color": "#166534",
+    "description": "Nigerian Cooperative Management System",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

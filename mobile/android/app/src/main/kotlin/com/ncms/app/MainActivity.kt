@@ -1,4 +1,4 @@
-package com.ncms.ncms_mobile
+package com.ncms.app
 
 import io.flutter.embedding.android.FlutterActivity
 

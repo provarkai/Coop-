@@ -64,9 +64,61 @@ tree (which reads Flutter's real semantics, not painted pixels) confirms the act
 were all correct, and a real Android/iOS build doesn't use CanvasKit or a font CDN at all; it
 renders with Skia and bundled/system fonts like any other native app.
 
+## Branding & app identity
+
+- App name: **NCMS**. Android application ID / iOS bundle ID: **com.ncms.app**.
+- Icon: a simple green monogram (`assets/icon/icon.png`, matching the app's `#166534` theme
+  color), generated across all platform sizes via `flutter_launcher_icons`
+  (`dart run flutter_launcher_icons` after editing `assets/icon/`).
+
+## Release signing (Android)
+
+`android/app/build.gradle.kts` reads release-signing config from `android/key.properties`
+(gitignored — this is a secret, same treatment as any other credential in this repo, never
+committed). Without that file present, `flutter build apk/appbundle --release` silently falls
+back to debug signing, which Play Console will reject.
+
+To build a real release yourself, create `android/key.properties`:
+
+```properties
+storePassword=<your keystore password>
+keyPassword=<same as storePassword -- PKCS12 keystores require these to match>
+keyAlias=<your key alias>
+storeFile=<absolute path to your .jks keystore>
+```
+
+Generate a keystore if you don't have one:
+
+```bash
+keytool -genkeypair -v -keystore /path/to/upload-keystore.jks \
+  -alias upload -keyalg RSA -keysize 2048 -validity 10000
+```
+
+**Keep that keystore file safe and back it up** — losing it means you can never publish an update
+under the same app listing again; Play Console has no recovery path for a lost upload key.
+
+Then:
+
+```bash
+flutter build appbundle --release --dart-define=API_URL=<your backend URL>
+```
+
+Building for a single architecture (`--target-platform=android-arm64`, which covers essentially
+all real Android phones in use today) meaningfully shrinks the output if you need to hand the
+`.aab` around outside Play Console's own upload flow, at the cost of not supporting 32-bit ARM or
+x86 devices/emulators.
+
 ## Distribution
 
-Not done in this pass. Google Play Console access is available for a future release, but signing,
-store listings, and release tracks are a separate step from getting the app built and functionally
-verified, which is what this sprint covers. See `docs/DEPLOYMENT.md` for how the backend/web app
-are deployed; there's no mobile equivalent yet.
+Not fully done in this pass — a signed release build exists and has been produced (package
+`com.ncms.app`, real release keystore, pointed at the live backend), but it hasn't been rolled
+out through Play Console's internal testing track yet under this repo's automation. Automating
+that end-to-end needs a Google Play Developer API service-account key (JSON, from a service
+account with Play Console "Release to testing tracks" permission on this specific app, with the
+Android Publisher API enabled on that exact same Google Cloud project) plus the app already
+existing in Play Console (the API can't create a brand-new app listing — that first "Create app"
+click has to happen once in the Play Console UI). Absent that, the fallback is manual: take the
+signed `.aab` and upload it yourself under Testing → Internal testing → Create new release.
+
+See `docs/DEPLOYMENT.md` for how the backend/web app are deployed; there's no automated mobile
+deploy pipeline yet.
