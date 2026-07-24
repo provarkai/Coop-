@@ -172,7 +172,10 @@ class _SavingsAccountDetailScreenState
                   color: isCredit ? Colors.green : Colors.red,
                 ),
                 title: Text(t.type),
-                subtitle: Text(t.narration ?? t.createdAt),
+                subtitle: Text(
+                  [if (t.narration != null && t.narration!.isNotEmpty) t.narration, formatUtcIsoAsWat(t.createdAt)]
+                      .join(' · '),
+                ),
                 trailing: Text(
                   '${isCredit ? '+' : '-'}${formatNaira(t.amount)}',
                   style: TextStyle(

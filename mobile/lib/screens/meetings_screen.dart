@@ -51,12 +51,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
     }
   }
 
-  String _formatDate(String iso) {
-    final dt = DateTime.tryParse(iso);
-    if (dt == null) return iso;
-    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} '
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} WAT';
-  }
+  String _formatDate(String iso) => formatUtcIsoAsWat(iso) ?? iso;
 
   @override
   Widget build(BuildContext context) {

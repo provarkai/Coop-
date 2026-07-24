@@ -186,6 +186,8 @@ class Loan {
   final String outstandingBalance;
   final String? rejectionReason;
   final String? memberName;
+  final String createdAt;
+  final String? disbursedAt;
 
   Loan({
     required this.id,
@@ -195,6 +197,8 @@ class Loan {
     required this.outstandingBalance,
     this.rejectionReason,
     this.memberName,
+    required this.createdAt,
+    this.disbursedAt,
   });
 
   factory Loan.fromJson(Map<String, dynamic> json) {
@@ -208,6 +212,8 @@ class Loan {
       outstandingBalance: json['outstandingBalance'] as String,
       rejectionReason: json['rejectionReason'] as String?,
       memberName: user != null ? '${user['firstName']} ${user['lastName']}' : null,
+      createdAt: json['createdAt'] as String,
+      disbursedAt: json['disbursedAt'] as String?,
     );
   }
 }

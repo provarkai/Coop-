@@ -1,5 +1,6 @@
 import 'api_client.dart';
 import 'models.dart';
+import '../widgets/common.dart' show watWallClockToUtcIso;
 
 /// Typed methods over [ApiClient], mirroring the subset of frontend/src/lib/api.ts
 /// that the mobile app needs.
@@ -228,7 +229,7 @@ class NcmsApi {
     body: {
       'title': title,
       'type': type,
-      'scheduledAt': scheduledAt.toUtc().toIso8601String(),
+      'scheduledAt': watWallClockToUtcIso(scheduledAt),
       if (location != null && location.isNotEmpty) 'location': location,
       if (agendaItems.isNotEmpty)
         'agendaItems': agendaItems.map((t) => {'title': t}).toList(),

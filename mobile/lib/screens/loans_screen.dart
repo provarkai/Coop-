@@ -140,6 +140,12 @@ class _LoansScreenState extends State<LoansScreen> {
                         Text(
                           '${loan.termMonths} months · outstanding ${formatNaira(loan.outstandingBalance)}',
                         ),
+                        Text(
+                          loan.disbursedAt != null
+                              ? 'Disbursed ${formatUtcIsoAsWat(loan.disbursedAt)}'
+                              : 'Applied ${formatUtcIsoAsWat(loan.createdAt)}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                         if (loan.rejectionReason != null)
                           Text(
                             'Rejected: ${loan.rejectionReason}',
