@@ -6,6 +6,11 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Railway (and most PaaS platforms) terminate TLS and proxy requests
+  // through their edge layer; without this, Express's req.ip reflects the
+  // proxy's immediate peer address rather than X-Forwarded-For, which can
+  // vary per request and makes the IP-keyed rate limiter below unreliable.
+  app.set('trust proxy', 1);
   app.use(helmet());
   app.enableCors({
     origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
