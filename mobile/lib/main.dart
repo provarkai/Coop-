@@ -24,6 +24,7 @@ class NcmsApp extends StatelessWidget {
         theme: ThemeData(
           colorSchemeSeed: const Color(0xFF166534),
           useMaterial3: true,
+          fontFamily: 'Roboto',
         ),
         home: const RootScreen(),
       ),
