@@ -35,6 +35,11 @@
 // aiSummary since regenerating them costs a real LLM call. Deterministic
 // (non-LLM) loan risk scoring and fraud-signal detection, computed on
 // demand from existing data.
+// Regulator-onboarding model: cooperative creation is SUPER_ADMIN-only (the
+// platform team creates a cooperative at a regulator's request, per the
+// Nigerian Co-operative Societies Act's registration process), and a
+// cooperative is assigned to a regulator for oversight, generally scoped by
+// the state field.
 
 generator client {
   provider = "prisma-client-js"
@@ -98,6 +103,8 @@ model User {
   documentsUploaded           Document[]              @relation("DocumentUploader")
   notificationsReceived       Notification[]          @relation("NotificationRecipient")
   notificationsSent           Notification[]          @relation("NotificationSender")
+  regulatorAssignments        RegulatorAssignment[]   @relation("RegulatorAssignmentRegulator")
+  regulatorAssignmentsMade    RegulatorAssignment[]   @relation("RegulatorAssignmentAssignedBy")
 }
 
 model RefreshToken {
@@ -136,6 +143,7 @@ model Cooperative {
   id                      String   @id @default(cuid())
   name                    String
   slug                    String   @unique
+  state                   String?
   registrationNumber      String?
   email                   String?
   phone                   String?
@@ -148,22 +156,25 @@ model Cooperative {
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 
-  branches          Branch[]
-  committees        Committee[]
-  memberships       CooperativeMembership[]
-  auditLogs         AuditLog[]
-  complianceFilings ComplianceFiling[]
-  savingsProducts   SavingsProduct[]
-  savingsAccounts   SavingsAccount[]
-  loanProducts      LoanProduct[]
-  loans             Loan[]
-  payments          Payment[]
-  accounts          Account[]
-  journalEntries    JournalEntry[]
-  budgets           Budget[]
-  meetings          Meeting[]
-  documents         Document[]
-  notifications     Notification[]
+  branches             Branch[]
+  committees           Committee[]
+  memberships          CooperativeMembership[]
+  auditLogs            AuditLog[]
+  complianceFilings    ComplianceFiling[]
+  savingsProducts      SavingsProduct[]
+  savingsAccounts      SavingsAccount[]
+  loanProducts         LoanProduct[]
+  loans                Loan[]
+  payments             Payment[]
+  accounts             Account[]
+  journalEntries       JournalEntry[]
+  budgets              Budget[]
+  meetings             Meeting[]
+  documents            Document[]
+  notifications        Notification[]
+  regulatorAssignments RegulatorAssignment[]
+
+  @@index([state])
 }
 
 model Branch {
@@ -312,6 +323,24 @@ model ComplianceFiling {
 
   @@index([cooperativeId])
   @@index([status])
+}
+
+// A regulator only sees/oversees cooperatives explicitly assigned to them
+// (state-by-state, per the Nigerian Co-operative Societies Act's federal/state
+// Director of Cooperatives structure) -- SUPER_ADMIN bypasses this and sees
+// every cooperative regardless of assignment.
+model RegulatorAssignment {
+  id              String      @id @default(cuid())
+  cooperativeId   String
+  cooperative     Cooperative @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  regulatorUserId String
+  regulator       User        @relation("RegulatorAssignmentRegulator", fields: [regulatorUserId], references: [id], onDelete: Cascade)
+  assignedByUserId String
+  assignedBy      User        @relation("RegulatorAssignmentAssignedBy", fields: [assignedByUserId], references: [id])
+  createdAt       DateTime    @default(now())
+
+  @@unique([cooperativeId, regulatorUserId])
+  @@index([regulatorUserId])
 }
 
 enum SavingsAccountStatus {

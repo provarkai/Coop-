@@ -17,6 +17,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { AccountingService } from '../accounting/accounting.service';
+import { RegulatorAssignmentsService } from '../regulator-assignments/regulator-assignments.service';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { VIEW_LOAN_ROLES } from '../cooperatives/roles.constants';
 import { CreateLoanProductDto } from './dto/create-loan-product.dto';
@@ -33,6 +34,7 @@ export class LoansService {
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
     private readonly accounting: AccountingService,
+    private readonly regulatorAssignments: RegulatorAssignmentsService,
   ) {}
 
   async createProduct(cooperativeId: string, dto: CreateLoanProductDto) {
@@ -661,7 +663,19 @@ export class LoansService {
   }
 
   private async assertMember(cooperativeId: string, user: AuthenticatedUser) {
-    if (user.role === Role.SUPER_ADMIN || user.role === Role.REGULATOR) {
+    if (user.role === Role.SUPER_ADMIN) {
+      return;
+    }
+    if (user.role === Role.REGULATOR) {
+      const assigned = await this.regulatorAssignments.isAssigned(
+        user.userId,
+        cooperativeId,
+      );
+      if (!assigned) {
+        throw new ForbiddenException(
+          'You are not assigned to this cooperative',
+        );
+      }
       return;
     }
     await this.assertActiveMembership(cooperativeId, user.userId);

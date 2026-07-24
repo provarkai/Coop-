@@ -16,6 +16,7 @@ import * as QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { AccountingService } from '../accounting/accounting.service';
+import { RegulatorAssignmentsService } from '../regulator-assignments/regulator-assignments.service';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { VIEW_SAVINGS_ROLES } from '../cooperatives/roles.constants';
 import { CreateSavingsProductDto } from './dto/create-savings-product.dto';
@@ -32,6 +33,7 @@ export class SavingsService {
     private readonly auditLog: AuditLogService,
     private readonly config: ConfigService,
     private readonly accounting: AccountingService,
+    private readonly regulatorAssignments: RegulatorAssignmentsService,
   ) {}
 
   async createProduct(cooperativeId: string, dto: CreateSavingsProductDto) {
@@ -394,7 +396,19 @@ export class SavingsService {
   }
 
   private async assertMember(cooperativeId: string, user: AuthenticatedUser) {
-    if (user.role === Role.SUPER_ADMIN || user.role === Role.REGULATOR) {
+    if (user.role === Role.SUPER_ADMIN) {
+      return;
+    }
+    if (user.role === Role.REGULATOR) {
+      const assigned = await this.regulatorAssignments.isAssigned(
+        user.userId,
+        cooperativeId,
+      );
+      if (!assigned) {
+        throw new ForbiddenException(
+          'You are not assigned to this cooperative',
+        );
+      }
       return;
     }
     const membership = await this.prisma.cooperativeMembership.findUnique({

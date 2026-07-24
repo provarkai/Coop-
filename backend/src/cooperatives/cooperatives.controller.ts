@@ -12,7 +12,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { Role } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { CooperativesService } from './cooperatives.service';
 import { CreateCooperativeDto } from './dto/create-cooperative.dto';
@@ -42,6 +44,7 @@ import {
 export class CooperativesController {
   constructor(private readonly cooperatives: CooperativesService) {}
 
+  @Roles(Role.SUPER_ADMIN)
   @Post()
   create(
     @CurrentUser() user: AuthenticatedUser,

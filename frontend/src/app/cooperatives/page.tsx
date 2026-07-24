@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, ApiError, getAccessToken, type Cooperative } from "@/lib/api";
+import { api, ApiError, getAccessToken, type AuthUser, type Cooperative } from "@/lib/api";
 
 export default function CooperativesPage() {
   const router = useRouter();
   const [cooperatives, setCooperatives] = useState<Cooperative[] | null>(null);
+  const [me, setMe] = useState<AuthUser | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -19,6 +20,7 @@ export default function CooperativesPage() {
       .listCooperatives()
       .then(setCooperatives)
       .catch((err) => setError(err instanceof ApiError ? err.message : "Something went wrong"));
+    api.me().then(setMe).catch(() => {});
   }, [router]);
 
   return (
@@ -26,12 +28,14 @@ export default function CooperativesPage() {
       <div className="w-full max-w-lg space-y-4 rounded-xl border border-black/[.08] bg-white p-8 dark:border-white/[.145] dark:bg-zinc-950">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-semibold text-black dark:text-zinc-50">My cooperatives</h1>
-          <Link
-            href="/cooperatives/new"
-            className="rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
-          >
-            + New
-          </Link>
+          {me?.role === "SUPER_ADMIN" && (
+            <Link
+              href="/cooperatives/new"
+              className="rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
+            >
+              + New
+            </Link>
+          )}
         </div>
 
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}

@@ -75,8 +75,13 @@ describe('Regulatory compliance (e2e)', () => {
 
     const coop = await request(app.getHttpServer())
       .post('/cooperatives')
-      .set('Authorization', `Bearer ${coopAdminToken}`)
-      .send({ name: 'Compliance Coop', slug })
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({
+        name: 'Compliance Coop',
+        slug,
+        state: 'Lagos',
+        initialAdminEmail: coopAdminEmail,
+      })
       .expect(201);
     cooperativeId = coop.body.id;
   });
@@ -141,11 +146,76 @@ describe('Regulatory compliance (e2e)', () => {
       .expect(403);
   });
 
-  it('lets a regulator view any cooperative without being a member', async () => {
+  it('denies a regulator access to a cooperative they are not yet assigned to', async () => {
+    await request(app.getHttpServer())
+      .get(`/cooperatives/${cooperativeId}`)
+      .set('Authorization', `Bearer ${regulatorToken}`)
+      .expect(403);
+  });
+
+  it('lets a SUPER_ADMIN assign the regulator to the cooperative (by location)', async () => {
+    await request(app.getHttpServer())
+      .post('/compliance/assignments')
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ cooperativeId, regulatorEmail })
+      .expect(201);
+
+    // A non-SUPER_ADMIN, even a regulator, cannot assign themselves.
+    await request(app.getHttpServer())
+      .post('/compliance/assignments')
+      .set('Authorization', `Bearer ${regulatorToken}`)
+      .send({ cooperativeId, regulatorEmail })
+      .expect(403);
+  });
+
+  it('lets an assigned regulator view the cooperative without being a member', async () => {
     await request(app.getHttpServer())
       .get(`/cooperatives/${cooperativeId}`)
       .set('Authorization', `Bearer ${regulatorToken}`)
       .expect(200);
+  });
+
+  it("lets an assigned regulator view the cooperative's financial standing and meetings", async () => {
+    await request(app.getHttpServer())
+      .get(`/compliance/cooperatives/${cooperativeId}/financial-standing`)
+      .set('Authorization', `Bearer ${regulatorToken}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .get(`/compliance/cooperatives/${cooperativeId}/meetings`)
+      .set('Authorization', `Bearer ${regulatorToken}`)
+      .expect(200);
+  });
+
+  it('denies an unassigned regulator access to this cooperative', async () => {
+    const otherRegulatorEmail = `compliance-other-regulator-${suffix}@example.com`;
+    const other = await registerAndLogin(otherRegulatorEmail);
+    await prisma.user.update({
+      where: { id: other.userId },
+      data: { role: Role.REGULATOR },
+    });
+    const otherRegulatorToken = await login(otherRegulatorEmail);
+
+    await request(app.getHttpServer())
+      .get(`/cooperatives/${cooperativeId}`)
+      .set('Authorization', `Bearer ${otherRegulatorToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get(`/compliance/cooperatives/${cooperativeId}/financial-standing`)
+      .set('Authorization', `Bearer ${otherRegulatorToken}`)
+      .expect(403);
+
+    // Unlike cooperative-scoped routes, the cross-tenant /compliance/cooperatives
+    // list simply omits cooperatives the regulator isn't assigned to.
+    const list = await request(app.getHttpServer())
+      .get('/compliance/cooperatives')
+      .set('Authorization', `Bearer ${otherRegulatorToken}`)
+      .expect(200);
+    expect(list.body.some((c: { id: string }) => c.id === cooperativeId)).toBe(
+      false,
+    );
+
+    await prisma.user.deleteMany({ where: { email: otherRegulatorEmail } });
   });
 
   it('lets governance submit a compliance filing, visible to cooperative members', async () => {

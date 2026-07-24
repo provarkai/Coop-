@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { createCooperativeAsSuperAdmin } from './helpers/bootstrap-cooperative';
 import { AiClientService } from '../src/ai/ai-client.service';
 
 const MOCK_ANSWER = 'MOCK AI RESPONSE';
@@ -63,12 +64,13 @@ describe('AI Features (e2e)', () => {
     const outsider = await registerAndLogin(outsiderEmail);
     outsiderToken = outsider.accessToken;
 
-    const coop = await request(app.getHttpServer())
-      .post('/cooperatives')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'AI Test Cooperative', slug })
-      .expect(201);
-    cooperativeId = coop.body.id;
+    cooperativeId = (
+      await createCooperativeAsSuperAdmin(app, prisma, {
+        name: 'AI Test Cooperative',
+        slug,
+        initialAdminEmail: adminEmail,
+      })
+    ).cooperativeId;
 
     await request(app.getHttpServer())
       .post(`/cooperatives/${cooperativeId}/members`)

@@ -18,6 +18,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { AccountingService } from '../accounting/accounting.service';
+import { RegulatorAssignmentsService } from '../regulator-assignments/regulator-assignments.service';
 import { VIEW_DASHBOARD_ROLES } from '../cooperatives/roles.constants';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AiClientService } from './ai-client.service';
@@ -44,6 +45,7 @@ export class AiService {
     private readonly auditLog: AuditLogService,
     private readonly aiClient: AiClientService,
     private readonly accounting: AccountingService,
+    private readonly regulatorAssignments: RegulatorAssignmentsService,
   ) {}
 
   /**
@@ -466,7 +468,19 @@ export class AiService {
   }
 
   private async assertMember(cooperativeId: string, user: AuthenticatedUser) {
-    if (user.role === Role.SUPER_ADMIN || user.role === Role.REGULATOR) {
+    if (user.role === Role.SUPER_ADMIN) {
+      return;
+    }
+    if (user.role === Role.REGULATOR) {
+      const assigned = await this.regulatorAssignments.isAssigned(
+        user.userId,
+        cooperativeId,
+      );
+      if (!assigned) {
+        throw new ForbiddenException(
+          'You are not assigned to this cooperative',
+        );
+      }
       return;
     }
     const membership = await this.prisma.cooperativeMembership.findUnique({

@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { UsersModule } from '../users/users.module';
 import { AccountingModule } from '../accounting/accounting.module';
+import { RegulatorAssignmentsModule } from '../regulator-assignments/regulator-assignments.module';
 import { LoansController } from './loans.controller';
 import { LoansService } from './loans.service';
 
 @Module({
-  imports: [UsersModule, AccountingModule],
+  imports: [UsersModule, AccountingModule, RegulatorAssignmentsModule],
   controllers: [LoansController],
   providers: [LoansService],
   exports: [LoansService],

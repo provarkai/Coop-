@@ -23,8 +23,9 @@ See [`docs/PRD.md`](docs/PRD.md), [`docs/SDD.md`](docs/SDD.md), [`docs/ROADMAP.m
 
 - **Sprint 13 (Hardening):** done. Security: [Helmet](https://helmetjs.github.io/) security headers on every response; rate limiting (`@nestjs/throttler`) on all routes (600 req/min per IP default — sized so a single cooperative page's dozen-plus parallel API calls never trips it) with a tighter limit (10 req/min) on brute-force-sensitive auth routes (login, register, forgot/reset password, MFA enable/disable), automatically disabled under the Jest test runner so the e2e suite isn't throttled, and trusting the first proxy hop (`app.set('trust proxy', 1)`) so it keys on the real client IP behind Railway's edge; safety caps on the two genuinely platform-wide (not cooperative-scoped) unbounded queries (list-all-users, list-all-cooperatives-for-compliance). **Bug fix:** the document-upload endpoint accepted up to ~7.5MB of base64 content per its DTO, but Express's default JSON body-parser limit is 100kb — any upload over roughly 75KB decoded would have failed silently; raised to 10MB. `npm audit`: backend is clean; the frontend's only findings are a transitive `postcss`/`sharp` pair bundled *inside* Next.js's own build tooling (not exposed to runtime request handling) with no non-preview Next.js release fixing them yet — tracked as an accepted risk pending a stable upstream release. Load testing (`autocannon`) confirmed sub-10ms median latency on the KPI dashboard endpoint under concurrent load, and confirmed the rate limiter enforces its configured cap exactly (verified against both the local dev server and the live Railway deployment). Accessibility: `aria-label`s added to the primary authentication entry flows (login, register, forgot/reset password, MFA, create-cooperative) whose inputs previously relied on placeholder text alone; a broader form-by-form audit remains follow-up work.
 - **Sprint 14 (Deployment & Go-Live):** done. A `GET /health` endpoint (checks database connectivity, exempt from rate limiting) for Railway's health check and external uptime monitors. An idempotent pilot-cooperative seed script (`backend/prisma/seed.ts`, run via `npx prisma db seed`) so a fresh deployment has a demo cooperative and admin login to explore rather than an empty database. New [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) (production readiness checklist: env vars, migrations, seeding, health checks, hardening summary, pre-go-live steps) and [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) (a role-by-role walkthrough of every feature). Tagged **v1.0.0** — see [`CHANGELOG.md`](CHANGELOG.md) for the full release history.
+- **Regulator-scoped cooperative onboarding (out-of-sequence addition):** done. Cooperative creation is now `SUPER_ADMIN`-only — reflecting how cooperative registration actually works in Nigeria: a `Cooperative` has a `state`, the platform team creates it on a regulator's request (per the Nigerian Co-operative Societies Act's registration process), naming an already-registered user as its `initialAdminEmail`/`COOPERATIVE_ADMIN` rather than the `SUPER_ADMIN` caller. A new `RegulatorAssignment` model (cooperative ↔ regulator, by location) scopes a regulator's access to only their assigned cooperatives — everywhere a `REGULATOR` previously had blanket cross-cooperative read access (cooperative detail, documents, meetings, savings, loans, AI assistant, compliance filings) now checks assignment instead; `SUPER_ADMIN` stays unscoped. Regulators get two new read-only endpoints per assigned cooperative — financial standing (the same KPI dashboard governance sees) and meetings — plus assignment-management endpoints for `SUPER_ADMIN`. Matching Next.js UI: a `SUPER_ADMIN`-only cooperative registration form, the self-service "+ New" button removed for everyone else, and the regulator dashboard redesigned into collapsed per-cooperative cards (member/filing counts) that expand on click into financial standing, meetings, and (`SUPER_ADMIN`) an inline regulator-assignment manager.
 
-This is **v1.0.0**. Every Playbook sprint is complete, including Sprint 11 (Mobile Apps).
+This is **v1.0.0** plus the regulator-scoped onboarding model described above. Every Playbook sprint is complete, including Sprint 11 (Mobile Apps).
 
 ## Structure
 
@@ -94,7 +95,7 @@ All routes require a valid JWT except the ones above marked public by design (re
 
 | Endpoint | Description |
 | --- | --- |
-| `POST /cooperatives` | Create a cooperative; creator becomes its `COOPERATIVE_ADMIN` |
+| `POST /cooperatives` | Register a cooperative (`SUPER_ADMIN`-only): takes `name`, `slug`, `state`, `initialAdminEmail` (an already-registered user, who becomes `COOPERATIVE_ADMIN` — not the `SUPER_ADMIN` caller), optional `regulatorEmail` (immediately assigns that regulator) |
 | `GET /cooperatives` | List cooperatives the caller belongs to (all, for `SUPER_ADMIN`) |
 | `GET /cooperatives/:id` | Get a cooperative (any active member) |
 | `PATCH /cooperatives/:id` | Update settings, by-laws, financial year (`COOPERATIVE_ADMIN`/`CHAIRMAN`) |
@@ -135,12 +136,19 @@ Write/manage actions stay restricted to the narrower, function-specific role lis
 | `GET /users` \| `PATCH /users/:id/role` | `SUPER_ADMIN`-only: list platform users and change a user's platform role |
 | `POST /cooperatives/:id/compliance-filings` | Submit a filing (`COOPERATIVE_ADMIN`/`CHAIRMAN`) |
 | `GET /cooperatives/:id/compliance-filings` | List a cooperative's own filings (any active member) |
-| `GET /compliance/cooperatives` | Cross-tenant list of all cooperatives (`REGULATOR`/`SUPER_ADMIN`) |
-| `GET /compliance/filings` | Cross-tenant list of all filings, optional `?status=` filter (`REGULATOR`/`SUPER_ADMIN`) |
-| `GET /compliance/filings/:id` | Filing detail |
-| `PATCH /compliance/filings/:id/review` | Approve/reject a filing (can't re-review one already decided) |
+| `GET /compliance/cooperatives` | List cooperatives (`REGULATOR`/`SUPER_ADMIN`) — a `REGULATOR` only sees cooperatives assigned to them via `RegulatorAssignment`; `SUPER_ADMIN` sees every cooperative |
+| `GET /compliance/filings` | List filings, optional `?status=` filter — same assignment scoping as above |
+| `GET /compliance/filings/:id` | Filing detail (403 if the caller is a `REGULATOR` not assigned to that filing's cooperative) |
+| `PATCH /compliance/filings/:id/review` | Approve/reject a filing (can't re-review one already decided; same assignment scoping) |
+| `GET /compliance/cooperatives/:id/financial-standing` | The same KPI dashboard governance sees (`REGULATOR` must be assigned; `SUPER_ADMIN` unrestricted) |
+| `GET /compliance/cooperatives/:id/meetings` | A cooperative's meetings (same access rule) |
+| `GET /compliance/cooperatives/:id/assignments` | List regulators assigned to a cooperative (`SUPER_ADMIN`-only) |
+| `POST /compliance/assignments` | Assign a regulator to a cooperative by email (`SUPER_ADMIN`-only); the target user must already have the `REGULATOR` or `SUPER_ADMIN` platform role |
+| `DELETE /compliance/assignments/:id` | Remove a regulator assignment (`SUPER_ADMIN`-only) |
 
 **Bootstrapping:** there's no admin yet to grant the first `SUPER_ADMIN`, so it must be set directly in the database (`UPDATE "User" SET role = 'SUPER_ADMIN' WHERE email = '...'`). From then on, use `PATCH /users/:id/role` (or the "Manage user roles" page) to promote further admins or regulators. Role changes are embedded in the JWT at login, so a promoted user must log in again before the new role takes effect.
+
+**Regulator scoping:** every other read endpoint a `REGULATOR` can reach cooperative-scoped data through (`GET /cooperatives/:id`, documents, meetings, savings, loans, the AI assistant) applies the same `RegulatorAssignment` check as above — a `REGULATOR` who isn't assigned to a cooperative gets a `403` even though the route itself doesn't live under `/compliance`. `SUPER_ADMIN` bypasses this check everywhere.
 
 ## Savings API
 

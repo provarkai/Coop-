@@ -12,10 +12,15 @@ it) that creates a ready-to-explore cooperative:
 - **Cooperative:** NCMS Demo Cooperative (`ncms-demo`)
 - **Admin login:** `demo-admin@ncms.example` / `DemoPass123!`
 
-Log in with that account, or register your own account and create a new
-cooperative — either works. The rest of this guide assumes you're on a
-cooperative's detail page (`/cooperatives/:id`), which has a left sidebar
+Log in with that account, or register your own account and **join** it via an
+invite link shared by an existing admin. The rest of this guide assumes you're
+on a cooperative's detail page (`/cooperatives/:id`), which has a left sidebar
 jumping to every section described below.
+
+Cooperatives themselves aren't self-service: per the Nigerian Co-operative
+Societies Act, registering a new cooperative is done by the platform team
+(`SUPER_ADMIN`) at a regulator's request, from `/cooperatives/new` — see
+"As a regulator or platform admin" below.
 
 ## Getting started (anyone)
 
@@ -23,9 +28,8 @@ jumping to every section described below.
 2. Optionally enable **two-factor authentication** from `/mfa` — scan the QR
    code with an authenticator app (Google Authenticator, Authy, etc.) and
    confirm with a 6-digit code.
-3. From `/cooperatives`, either **create a cooperative** (you become its
-   `COOPERATIVE_ADMIN`) or **join one** via an invite link shared by an
-   existing admin (`/cooperatives/:id/join`).
+3. **Join** an existing cooperative via an invite link shared by its admin
+   (`/cooperatives/:id/join`).
 
 ## As a plain member
 
@@ -86,12 +90,27 @@ the precise role breakdown), but broadly:
 - **Audit log**: a chronological record of governance actions on this
   cooperative.
 
-## As a regulator
+## As a regulator or platform admin
 
-Regulators are a platform-wide role (not tied to any one cooperative). From
-`/regulator`, review every cooperative's submitted filings and
-approve/reject them. A `SUPER_ADMIN` bootstraps the first regulator via
-`/admin/users`.
+Regulators are a platform-wide role (not tied to any one cooperative). A
+`SUPER_ADMIN` bootstraps the first regulator via `/admin/users`.
+
+From `/regulator`, a regulator sees only the cooperatives assigned to them
+(mirroring the state-level Director of Cooperatives structure under the
+Nigerian Co-operative Societies Act); `SUPER_ADMIN` sees every cooperative.
+Each cooperative shows as a collapsed card (member/filing counts) — click it
+to drill into that cooperative's **financial standing** (the same KPI numbers
+governance sees) and **meetings**. The compliance filings section below still
+lists filings across every cooperative the caller can see, with
+approve/reject actions.
+
+`SUPER_ADMIN` gets two extra things on this page: a **"+ Register
+cooperative"** button (`/cooperatives/new` — name, slug, state, an
+already-registered user's email as the initial admin, and an optional
+regulator email to assign immediately), and, inside each cooperative's
+expanded card, an inline manager to assign or remove regulators for that
+cooperative by email (the target user must already hold the `REGULATOR` or
+`SUPER_ADMIN` platform role).
 
 ## Times and currency
 

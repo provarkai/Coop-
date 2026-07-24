@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- **Regulator-scoped cooperative onboarding** — Cooperative creation is now
+  `SUPER_ADMIN`-only: the platform team registers a cooperative on a
+  regulator's request (per the Nigerian Co-operative Societies Act's
+  registration process), naming an already-registered `initialAdminEmail` as
+  its `COOPERATIVE_ADMIN` and an optional `state` + `regulatorEmail` for
+  immediate assignment. New `RegulatorAssignment` model scopes a regulator's
+  read access (cooperative detail, documents, meetings, savings, loans, AI
+  assistant, compliance filings/financial-standing) to only the cooperatives
+  assigned to them — `SUPER_ADMIN` remains unscoped. New endpoints:
+  `POST/DELETE /compliance/assignments`, `GET
+  /compliance/cooperatives/:id/assignments`, and read-only
+  `GET /compliance/cooperatives/:id/financial-standing` /
+  `/meetings` for regulators. Frontend: a SUPER_ADMIN-only cooperative
+  registration form (name/slug/state/initial admin/regulator), the
+  self-service "+ New" cooperative button removed for everyone else, and the
+  regulator dashboard redesigned into collapsed per-cooperative
+  report/dashboard cards with a drill-down for financial standing, meetings,
+  and (SUPER_ADMIN) regulator-assignment management.
 - **Sprint 11 (Mobile Apps)** — A Flutter app (`mobile/`) for members and
   administrators, talking to the same NestJS API as the web app: JWT auth
   with platform-secure token storage and refresh-on-401, a cooperative

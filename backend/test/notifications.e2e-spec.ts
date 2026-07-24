@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { createCooperativeAsSuperAdmin } from './helpers/bootstrap-cooperative';
 
 describe('Notifications (e2e)', () => {
   let app: INestApplication<App>;
@@ -49,12 +50,13 @@ describe('Notifications (e2e)', () => {
     const member = await registerAndLogin(memberEmail);
     memberToken = member.accessToken;
 
-    const coop = await request(app.getHttpServer())
-      .post('/cooperatives')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Notifications Test Cooperative', slug })
-      .expect(201);
-    cooperativeId = coop.body.id;
+    cooperativeId = (
+      await createCooperativeAsSuperAdmin(app, prisma, {
+        name: 'Notifications Test Cooperative',
+        slug,
+        initialAdminEmail: adminEmail,
+      })
+    ).cooperativeId;
 
     await request(app.getHttpServer())
       .post(`/cooperatives/${cooperativeId}/members`)

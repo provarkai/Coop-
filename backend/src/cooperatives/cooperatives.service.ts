@@ -16,6 +16,7 @@ import * as QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { RegulatorAssignmentsService } from '../regulator-assignments/regulator-assignments.service';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { CreateCooperativeDto } from './dto/create-cooperative.dto';
 import { UpdateCooperativeDto } from './dto/update-cooperative.dto';
@@ -45,8 +46,14 @@ export class CooperativesService {
     private readonly auditLog: AuditLogService,
     private readonly config: ConfigService,
     private readonly pdf: PdfService,
+    private readonly regulatorAssignments: RegulatorAssignmentsService,
   ) {}
 
+  // Only SUPER_ADMIN can call this (enforced at the controller): the platform
+  // team creates a cooperative on a regulator's request, per the Nigerian
+  // Co-operative Societies Act's registration process -- it is not
+  // self-service. The creator never becomes the cooperative's admin;
+  // initialAdminEmail (an already-registered user) does.
   async create(creator: AuthenticatedUser, dto: CreateCooperativeDto) {
     const existingSlug = await this.prisma.cooperative.findUnique({
       where: { slug: dto.slug },
@@ -57,16 +64,62 @@ export class CooperativesService {
       );
     }
 
+    const initialAdmin = await this.users.findByEmail(dto.initialAdminEmail);
+    if (!initialAdmin) {
+      throw new NotFoundException(
+        'No user with that initial admin email is registered. They must create an account first.',
+      );
+    }
+
+    let regulator: Awaited<ReturnType<typeof this.users.findByEmail>> = null;
+    if (dto.regulatorEmail) {
+      regulator = await this.users.findByEmail(dto.regulatorEmail);
+      if (!regulator) {
+        throw new NotFoundException(
+          'No user with that regulator email is registered',
+        );
+      }
+      if (
+        regulator.role !== Role.REGULATOR &&
+        regulator.role !== Role.SUPER_ADMIN
+      ) {
+        throw new BadRequestException(
+          'That user does not have the REGULATOR platform role',
+        );
+      }
+    }
+
+    const cooperativeData = {
+      name: dto.name,
+      slug: dto.slug,
+      state: dto.state,
+      registrationNumber: dto.registrationNumber,
+      email: dto.email,
+      phone: dto.phone,
+      address: dto.address,
+    };
+
     return this.prisma.$transaction(async (tx) => {
-      const cooperative = await tx.cooperative.create({ data: dto });
+      const cooperative = await tx.cooperative.create({
+        data: cooperativeData,
+      });
       await tx.cooperativeMembership.create({
         data: {
           cooperativeId: cooperative.id,
-          userId: creator.userId,
+          userId: initialAdmin.id,
           role: Role.COOPERATIVE_ADMIN,
           status: MembershipStatus.ACTIVE,
         },
       });
+      if (regulator) {
+        await tx.regulatorAssignment.create({
+          data: {
+            cooperativeId: cooperative.id,
+            regulatorUserId: regulator.id,
+            assignedByUserId: creator.userId,
+          },
+        });
+      }
       return cooperative;
     });
   }
@@ -903,7 +956,19 @@ export class CooperativesService {
   }
 
   private async assertMember(cooperativeId: string, user: AuthenticatedUser) {
-    if (user.role === Role.SUPER_ADMIN || user.role === Role.REGULATOR) {
+    if (user.role === Role.SUPER_ADMIN) {
+      return;
+    }
+    if (user.role === Role.REGULATOR) {
+      const assigned = await this.regulatorAssignments.isAssigned(
+        user.userId,
+        cooperativeId,
+      );
+      if (!assigned) {
+        throw new ForbiddenException(
+          'You are not assigned to this cooperative',
+        );
+      }
       return;
     }
     await this.assertActiveMembership(

@@ -17,6 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { PdfService } from '../pdf/pdf.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RegulatorAssignmentsService } from '../regulator-assignments/regulator-assignments.service';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { MANAGE_GOVERNANCE_ROLES } from '../cooperatives/roles.constants';
 import { CreateMeetingDto } from './dto/create-meeting.dto';
@@ -53,6 +54,7 @@ export class MeetingsService {
     private readonly auditLog: AuditLogService,
     private readonly pdf: PdfService,
     private readonly notifications: NotificationsService,
+    private readonly regulatorAssignments: RegulatorAssignmentsService,
   ) {}
 
   async createMeeting(
@@ -514,7 +516,19 @@ export class MeetingsService {
   }
 
   private async assertMember(cooperativeId: string, user: AuthenticatedUser) {
-    if (user.role === Role.SUPER_ADMIN || user.role === Role.REGULATOR) {
+    if (user.role === Role.SUPER_ADMIN) {
+      return;
+    }
+    if (user.role === Role.REGULATOR) {
+      const assigned = await this.regulatorAssignments.isAssigned(
+        user.userId,
+        cooperativeId,
+      );
+      if (!assigned) {
+        throw new ForbiddenException(
+          'You are not assigned to this cooperative',
+        );
+      }
       return;
     }
     await this.assertActiveMembership(cooperativeId, user.userId);

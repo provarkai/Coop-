@@ -4,6 +4,10 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import {
+  createCooperativeAsSuperAdmin,
+  loginAsFreshSuperAdmin,
+} from './helpers/bootstrap-cooperative';
 
 describe('Cooperatives (e2e)', () => {
   let app: INestApplication<App>;
@@ -66,15 +70,26 @@ describe('Cooperatives (e2e)', () => {
     await app.close();
   });
 
-  it('creates a cooperative and makes the creator its COOPERATIVE_ADMIN', async () => {
-    const res = await request(app.getHttpServer())
+  it('rejects cooperative creation from a non-SUPER_ADMIN', async () => {
+    await request(app.getHttpServer())
       .post('/cooperatives')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Test Cooperative', slug })
-      .expect(201);
+      .send({
+        name: 'Rejected Cooperative',
+        slug: `rejected-${suffix}`,
+        state: 'Lagos',
+        initialAdminEmail: adminEmail,
+      })
+      .expect(403);
+  });
 
-    cooperativeId = res.body.id;
-    expect(res.body.slug).toBe(slug);
+  it('creates a cooperative as SUPER_ADMIN and makes initialAdminEmail its COOPERATIVE_ADMIN', async () => {
+    const { cooperativeId: id } = await createCooperativeAsSuperAdmin(
+      app,
+      prisma,
+      { name: 'Test Cooperative', slug, initialAdminEmail: adminEmail },
+    );
+    cooperativeId = id;
 
     const members = await request(app.getHttpServer())
       .get(`/cooperatives/${cooperativeId}/members`)
@@ -86,10 +101,16 @@ describe('Cooperatives (e2e)', () => {
   });
 
   it('rejects a duplicate slug', async () => {
+    const superAdmin = await loginAsFreshSuperAdmin(app, prisma);
     await request(app.getHttpServer())
       .post('/cooperatives')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Another Cooperative', slug })
+      .set('Authorization', `Bearer ${superAdmin.token}`)
+      .send({
+        name: 'Another Cooperative',
+        slug,
+        state: 'Lagos',
+        initialAdminEmail: adminEmail,
+      })
       .expect(409);
   });
 
@@ -240,14 +261,18 @@ describe('Cooperatives (e2e)', () => {
   });
 
   it('refuses to let the sole cooperative admin demote or remove themselves', async () => {
-    const solo = await registerAndLogin(`solo-admin-${suffix}@example.com`);
+    const soloEmail = `solo-admin-${suffix}@example.com`;
+    const solo = await registerAndLogin(soloEmail);
     const soloSlug = `solo-coop-${suffix}`;
-    const created = await request(app.getHttpServer())
-      .post('/cooperatives')
-      .set('Authorization', `Bearer ${solo.accessToken}`)
-      .send({ name: 'Solo Cooperative', slug: soloSlug })
-      .expect(201);
-    const soloCoopId = created.body.id;
+    const { cooperativeId: soloCoopId } = await createCooperativeAsSuperAdmin(
+      app,
+      prisma,
+      {
+        name: 'Solo Cooperative',
+        slug: soloSlug,
+        initialAdminEmail: soloEmail,
+      },
+    );
 
     await request(app.getHttpServer())
       .patch(`/cooperatives/${soloCoopId}/members/${solo.userId}`)

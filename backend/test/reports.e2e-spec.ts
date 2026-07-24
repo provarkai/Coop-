@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { createCooperativeAsSuperAdmin } from './helpers/bootstrap-cooperative';
 import { AiClientService } from '../src/ai/ai-client.service';
 
 describe('Reports & Dashboards (e2e)', () => {
@@ -56,12 +57,13 @@ describe('Reports & Dashboards (e2e)', () => {
     memberToken = member.accessToken;
     memberUserId = member.userId;
 
-    const coop = await request(app.getHttpServer())
-      .post('/cooperatives')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Reports Test Cooperative', slug })
-      .expect(201);
-    cooperativeId = coop.body.id;
+    cooperativeId = (
+      await createCooperativeAsSuperAdmin(app, prisma, {
+        name: 'Reports Test Cooperative',
+        slug,
+        initialAdminEmail: adminEmail,
+      })
+    ).cooperativeId;
 
     await request(app.getHttpServer())
       .post(`/cooperatives/${cooperativeId}/members`)

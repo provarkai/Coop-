@@ -20,6 +20,7 @@ export interface Cooperative {
   id: string;
   name: string;
   slug: string;
+  state: string | null;
   registrationNumber: string | null;
   email: string | null;
   phone: string | null;
@@ -156,6 +157,15 @@ export interface ComplianceFiling {
 
 export interface ComplianceCooperative extends Cooperative {
   _count: { memberships: number; complianceFilings: number };
+}
+
+export interface RegulatorAssignment {
+  id: string;
+  cooperativeId: string;
+  regulatorUserId: string;
+  assignedByUserId: string;
+  createdAt: string;
+  regulator?: { id: string; email: string; firstName: string; lastName: string };
 }
 
 export interface SavingsProduct {
@@ -596,8 +606,13 @@ export const api = {
 
   listCooperatives: () => request<Cooperative[]>("/cooperatives", { method: "GET" }, true),
 
-  createCooperative: (data: { name: string; slug: string }) =>
-    request<Cooperative>("/cooperatives", { method: "POST", body: JSON.stringify(data) }, true),
+  createCooperative: (data: {
+    name: string;
+    slug: string;
+    state: string;
+    initialAdminEmail: string;
+    regulatorEmail?: string;
+  }) => request<Cooperative>("/cooperatives", { method: "POST", body: JSON.stringify(data) }, true),
 
   getCooperative: (id: string) => request<Cooperative>(`/cooperatives/${id}`, { method: "GET" }, true),
 
@@ -770,6 +785,33 @@ export const api = {
       { method: "GET" },
       true,
     ),
+
+  getFinancialStanding: (cooperativeId: string) =>
+    request<DashboardSummary>(
+      `/compliance/cooperatives/${cooperativeId}/financial-standing`,
+      { method: "GET" },
+      true,
+    ),
+
+  getRegulatorMeetings: (cooperativeId: string) =>
+    request<Meeting[]>(`/compliance/cooperatives/${cooperativeId}/meetings`, { method: "GET" }, true),
+
+  listRegulatorAssignments: (cooperativeId: string) =>
+    request<RegulatorAssignment[]>(
+      `/compliance/cooperatives/${cooperativeId}/assignments`,
+      { method: "GET" },
+      true,
+    ),
+
+  assignRegulator: (cooperativeId: string, regulatorEmail: string) =>
+    request<RegulatorAssignment>(
+      "/compliance/assignments",
+      { method: "POST", body: JSON.stringify({ cooperativeId, regulatorEmail }) },
+      true,
+    ),
+
+  unassignRegulator: (assignmentId: string) =>
+    request<void>(`/compliance/assignments/${assignmentId}`, { method: "DELETE" }, true),
 
   reviewFiling: (filingId: string, status: "APPROVED" | "REJECTED", reviewNotes?: string) =>
     request<ComplianceFiling>(

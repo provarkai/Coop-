@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { createCooperativeAsSuperAdmin } from './helpers/bootstrap-cooperative';
 
 // Every non-MEMBER cooperative role should have at least read access to the dashboard,
 // savings, loans, and accounting sections, even roles with no specific manage permission
@@ -54,12 +55,13 @@ describe('Exco-wide read access (e2e)', () => {
     committeeToken = await registerAndLogin(committeeEmail);
     memberToken = await registerAndLogin(memberEmail);
 
-    const coop = await request(app.getHttpServer())
-      .post('/cooperatives')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Exco Read Access Test Cooperative', slug })
-      .expect(201);
-    cooperativeId = coop.body.id;
+    cooperativeId = (
+      await createCooperativeAsSuperAdmin(app, prisma, {
+        name: 'Exco Read Access Test Cooperative',
+        slug,
+        initialAdminEmail: adminEmail,
+      })
+    ).cooperativeId;
 
     await request(app.getHttpServer())
       .post(`/cooperatives/${cooperativeId}/members`)

@@ -17,6 +17,17 @@ export class CreateCooperativeDto {
   })
   slug: string;
 
+  @IsString()
+  @MinLength(2)
+  state: string;
+
+  @IsEmail()
+  initialAdminEmail: string;
+
+  @IsOptional()
+  @IsEmail()
+  regulatorEmail?: string;
+
   @IsOptional()
   @IsString()
   registrationNumber?: string;
