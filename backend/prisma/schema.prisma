@@ -29,6 +29,12 @@
 // scheduled (and manually triggerable) monthly digest that renders a PDF,
 // stores it via the Document repository under a new REPORT category, and
 // notifies members through the existing notification log.
+// Sprint 12: AI features via OpenRouter. Self-scoped assistant Q&A and
+// AI-authored monthly-report commentary (both computed on demand, not
+// persisted). AI-generated meeting summaries, persisted on Meeting.
+// aiSummary since regenerating them costs a real LLM call. Deterministic
+// (non-LLM) loan risk scoring and fraud-signal detection, computed on
+// demand from existing data.
 
 generator client {
   provider = "prisma-client-js"
@@ -647,6 +653,7 @@ model Meeting {
   location                String?
   status                  MeetingStatus @default(SCHEDULED)
   minutes                 String?
+  aiSummary               String?
   minutesRecordedByUserId String?
   minutesRecordedBy       User?         @relation("MeetingMinutesRecorder", fields: [minutesRecordedByUserId], references: [id])
   createdByUserId         String

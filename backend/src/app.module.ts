@@ -19,6 +19,7 @@ import { MeetingsModule } from './meetings/meetings.module';
 import { DocumentsModule } from './documents/documents.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReportsModule } from './reports/reports.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ReportsModule } from './reports/reports.module';
     DocumentsModule,
     NotificationsModule,
     ReportsModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [

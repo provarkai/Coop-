@@ -46,6 +46,7 @@ interface DashboardReportPdfInput {
     totalExpense: string;
     netSurplus: string;
   };
+  narrative?: string;
 }
 
 @Injectable()
@@ -124,6 +125,12 @@ export class PdfService {
         .text(`Monthly Report — ${data.period}`, { align: 'center' });
       doc.fontSize(10).text(data.cooperativeName, { align: 'center' });
       doc.moveDown();
+
+      if (data.narrative) {
+        doc.fontSize(14).text('Management Commentary');
+        doc.fontSize(11).text(data.narrative);
+        doc.moveDown();
+      }
 
       const s = data.summary;
       doc.fontSize(14).text('Membership');

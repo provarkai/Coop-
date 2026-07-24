@@ -406,6 +406,7 @@ export interface Meeting {
   location: string | null;
   status: MeetingStatus;
   minutes: string | null;
+  aiSummary: string | null;
   minutesRecordedByUserId: string | null;
   createdByUserId: string;
   createdAt: string;
@@ -414,7 +415,14 @@ export interface Meeting {
   resolutions?: Resolution[];
 }
 
-export type DocumentCategory = "BYLAWS" | "POLICY" | "FINANCIAL_STATEMENT" | "MEETING_MINUTES" | "FORM" | "OTHER";
+export type DocumentCategory =
+  | "BYLAWS"
+  | "POLICY"
+  | "FINANCIAL_STATEMENT"
+  | "MEETING_MINUTES"
+  | "FORM"
+  | "REPORT"
+  | "OTHER";
 
 export interface DocumentMetadata {
   id: string;
@@ -468,6 +476,21 @@ export interface TrendPoint {
   savingsNet: string;
   loanDisbursed: string;
   loanRepaid: string;
+}
+
+export interface LoanRiskScore {
+  score: number;
+  rating: "LOW" | "MEDIUM" | "HIGH";
+  factors: string[];
+  narrative: string;
+}
+
+export interface FraudAlert {
+  type: string;
+  description: string;
+  accountNumber: string;
+  member: string;
+  createdAt: string;
 }
 
 export class ApiError extends Error {
@@ -1137,6 +1160,26 @@ export const api = {
       { method: "POST" },
       true,
     ),
+
+  askAssistant: (cooperativeId: string, question: string) =>
+    request<{ answer: string }>(
+      `/cooperatives/${cooperativeId}/ai/assistant`,
+      { method: "POST", body: JSON.stringify({ question }) },
+      true,
+    ),
+
+  summarizeMeeting: (cooperativeId: string, meetingId: string) =>
+    request<{ aiSummary: string }>(
+      `/cooperatives/${cooperativeId}/meetings/${meetingId}/summarize`,
+      { method: "POST" },
+      true,
+    ),
+
+  getLoanRiskScore: (cooperativeId: string, loanId: string) =>
+    request<LoanRiskScore>(`/cooperatives/${cooperativeId}/loans/${loanId}/risk-score`, { method: "GET" }, true),
+
+  getFraudAlerts: (cooperativeId: string) =>
+    request<FraudAlert[]>(`/cooperatives/${cooperativeId}/fraud-alerts`, { method: "GET" }, true),
 };
 
 /** Fetches a binary file (PDF, document download) with the auth header attached, for triggering a browser save-as. */

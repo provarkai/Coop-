@@ -67,6 +67,7 @@ export default function MeetingsSection({ cooperativeId, me }: { cooperativeId: 
 
   const [minutesDraft, setMinutesDraft] = useState("");
   const [minutesError, setMinutesError] = useState<string | null>(null);
+  const [summarizing, setSummarizing] = useState(false);
 
   const [resolutionTitle, setResolutionTitle] = useState("");
   const [resolutionAgendaItemId, setResolutionAgendaItemId] = useState("");
@@ -235,6 +236,20 @@ export default function MeetingsSection({ cooperativeId, me }: { cooperativeId: 
       saveBlob(blob, `${selectedMeeting.title}-minutes.pdf`);
     } catch (err) {
       setMinutesError(err instanceof ApiError ? err.message : "Something went wrong");
+    }
+  }
+
+  async function onSummarizeWithAi() {
+    if (!selectedMeeting) return;
+    setMinutesError(null);
+    setSummarizing(true);
+    try {
+      await api.summarizeMeeting(cooperativeId, selectedMeeting.id);
+      await refreshSelected();
+    } catch (err) {
+      setMinutesError(err instanceof ApiError ? err.message : "Something went wrong");
+    } finally {
+      setSummarizing(false);
     }
   }
 
@@ -540,6 +555,23 @@ export default function MeetingsSection({ cooperativeId, me }: { cooperativeId: 
                 Save minutes
               </button>
             </form>
+
+            <div className="pt-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-black dark:text-zinc-50">AI summary</h3>
+                <button
+                  type="button"
+                  disabled={summarizing}
+                  onClick={() => void onSummarizeWithAi()}
+                  className="rounded-full border border-black/[.08] px-3 py-1 text-xs disabled:opacity-50 dark:border-white/[.145]"
+                >
+                  {summarizing ? "Summarizing…" : "Summarize with AI"}
+                </button>
+              </div>
+              {selectedMeeting.aiSummary && (
+                <p className="whitespace-pre-wrap pt-1 text-sm text-zinc-500">{selectedMeeting.aiSummary}</p>
+              )}
+            </div>
           </div>
         </section>
       )}

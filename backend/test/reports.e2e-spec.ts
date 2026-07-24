@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { AiClientService } from '../src/ai/ai-client.service';
 
 describe('Reports & Dashboards (e2e)', () => {
   let app: INestApplication<App>;
@@ -35,7 +36,10 @@ describe('Reports & Dashboards (e2e)', () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(AiClientService)
+      .useValue({ chat: () => Promise.resolve('MOCK AI NARRATIVE') })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(

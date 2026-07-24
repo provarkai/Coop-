@@ -25,6 +25,8 @@ import AccountingSection from "./AccountingSection";
 import MeetingsSection from "./MeetingsSection";
 import CommunicationSection from "./CommunicationSection";
 import ReportsSection from "./ReportsSection";
+import Sidebar from "./Sidebar";
+import AiAssistantSection from "./AiAssistantSection";
 
 const FILING_TYPES = ["ANNUAL_RETURN", "FINANCIAL_STATEMENT", "AGM_MINUTES", "OTHER"];
 
@@ -533,7 +535,10 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl flex-1 space-y-6 bg-zinc-50 px-4 py-10 dark:bg-black">
+    <div className="w-full flex-1 bg-zinc-50 px-4 py-10 dark:bg-black">
+      <div className="mx-auto flex w-full max-w-5xl items-start gap-6">
+        <Sidebar />
+        <div className="w-full max-w-2xl flex-1 space-y-6">
       <div>
         <Link href="/cooperatives" className="text-sm font-medium text-black dark:text-zinc-50">
           ← All cooperatives
@@ -547,7 +552,11 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
         )}
       </div>
 
-      <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+      <div id="dashboard">
+        <ReportsSection cooperativeId={id} />
+      </div>
+
+      <section id="settings" className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
         <h2 className="font-semibold text-black dark:text-zinc-50">Settings</h2>
         <form onSubmit={onSaveSettings} className="space-y-3">
           <ErrorText message={settingsError} />
@@ -712,7 +721,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
         </section>
       )}
 
-      <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+      <section id="members" className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
         <h2 className="font-semibold text-black dark:text-zinc-50">Members</h2>
         <ErrorText message={memberError} />
         <ul className="space-y-2">
@@ -808,7 +817,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
         )}
       </section>
 
-      <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+      <section id="savings" className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
         <h2 className="font-semibold text-black dark:text-zinc-50">Savings products</h2>
         <ErrorText message={productError} />
         <ul className="space-y-1 text-sm">
@@ -874,19 +883,31 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
         </section>
       )}
 
-      <LoansSection cooperativeId={id} me={me} />
+      <div id="loans">
+        <LoansSection cooperativeId={id} me={me} />
+      </div>
 
-      <PaymentsSection cooperativeId={id} me={me} />
+      <div id="payments">
+        <PaymentsSection cooperativeId={id} me={me} />
+      </div>
 
-      <AccountingSection cooperativeId={id} />
+      <div id="accounting">
+        <AccountingSection cooperativeId={id} />
+      </div>
 
-      <MeetingsSection cooperativeId={id} me={me} />
+      <div id="meetings">
+        <MeetingsSection cooperativeId={id} me={me} />
+      </div>
 
-      <CommunicationSection cooperativeId={id} />
+      <div id="documents">
+        <CommunicationSection cooperativeId={id} />
+      </div>
 
-      <ReportsSection cooperativeId={id} />
+      <div id="ai">
+        <AiAssistantSection cooperativeId={id} />
+      </div>
 
-      <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+      <section id="compliance" className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
         <h2 className="font-semibold text-black dark:text-zinc-50">Compliance filings</h2>
         <ErrorText message={filingError} />
         <ul className="space-y-1 text-sm">
@@ -950,7 +971,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
       </section>
 
       {auditLogs && (
-        <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+        <section id="audit" className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
           <h2 className="font-semibold text-black dark:text-zinc-50">Audit log</h2>
           <ul className="space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
             {auditLogs.map((entry) => (
@@ -962,6 +983,8 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
           </ul>
         </section>
       )}
+        </div>
+      </div>
     </div>
   );
 }

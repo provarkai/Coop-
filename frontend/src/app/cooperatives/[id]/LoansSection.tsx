@@ -8,6 +8,7 @@ import {
   type Loan,
   type LoanGuarantor,
   type LoanProduct,
+  type LoanRiskScore,
 } from "@/lib/api";
 
 function ErrorText({ message }: { message: string | null }) {
@@ -47,6 +48,22 @@ export default function LoansSection({ cooperativeId, me }: { cooperativeId: str
   const [guarantorEmailDrafts, setGuarantorEmailDrafts] = useState<Record<string, string>>({});
   const [repaymentDrafts, setRepaymentDrafts] = useState<Record<string, { amount: string; narration: string }>>({});
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const [riskScores, setRiskScores] = useState<Record<string, LoanRiskScore>>({});
+  const [riskLoading, setRiskLoading] = useState<Record<string, boolean>>({});
+
+  async function onCheckRiskScore(loanId: string) {
+    setActionError(null);
+    setRiskLoading((prev) => ({ ...prev, [loanId]: true }));
+    try {
+      const score = await api.getLoanRiskScore(cooperativeId, loanId);
+      setRiskScores((prev) => ({ ...prev, [loanId]: score }));
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Something went wrong");
+    } finally {
+      setRiskLoading((prev) => ({ ...prev, [loanId]: false }));
+    }
+  }
 
   async function reload() {
     setProducts(await api.listLoanProducts(cooperativeId));
@@ -281,6 +298,46 @@ export default function LoansSection({ cooperativeId, me }: { cooperativeId: str
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+            {canManage && (
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-zinc-600 dark:text-zinc-400">AI risk score</p>
+                  <button
+                    onClick={() => onCheckRiskScore(loan.id)}
+                    disabled={riskLoading[loan.id]}
+                    className="rounded-full border border-black/[.08] px-3 py-1 font-medium disabled:opacity-50 dark:border-white/[.145]"
+                  >
+                    {riskLoading[loan.id] ? "Scoring…" : "Check risk score"}
+                  </button>
+                </div>
+                {riskScores[loan.id] && (
+                  <div className="mt-1 space-y-1">
+                    <p>
+                      Score {riskScores[loan.id].score}/100 —{" "}
+                      <span
+                        className={
+                          riskScores[loan.id].rating === "LOW"
+                            ? "text-green-600 dark:text-green-400"
+                            : riskScores[loan.id].rating === "HIGH"
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-zinc-500"
+                        }
+                      >
+                        {riskScores[loan.id].rating}
+                      </span>
+                    </p>
+                    {riskScores[loan.id].factors.length > 0 && (
+                      <ul className="list-disc pl-4 text-zinc-500">
+                        {riskScores[loan.id].factors.map((f) => (
+                          <li key={f}>{f}</li>
+                        ))}
+                      </ul>
+                    )}
+                    <p className="text-zinc-500">{riskScores[loan.id].narrative}</p>
+                  </div>
+                )}
               </div>
             )}
             {canManage && (

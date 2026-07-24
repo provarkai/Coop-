@@ -7,6 +7,7 @@ import {
   downloadFile,
   saveBlob,
   type DashboardSummary,
+  type FraudAlert,
   type TrendPoint,
 } from "@/lib/api";
 
@@ -62,6 +63,7 @@ function MiniBarChart({
 export default function ReportsSection({ cooperativeId }: { cooperativeId: string }) {
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
   const [trends, setTrends] = useState<TrendPoint[]>([]);
+  const [fraudAlerts, setFraudAlerts] = useState<FraudAlert[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generatedMessage, setGeneratedMessage] = useState<string | null>(null);
@@ -76,6 +78,13 @@ export default function ReportsSection({ cooperativeId }: { cooperativeId: strin
       setTrends(trendData);
     } catch {
       setDashboard(null);
+    }
+    // Fraud alerts are gated to a narrower role set (admin/chairman/auditor)
+    // than the dashboard itself, so a 403 here shouldn't blank the dashboard.
+    try {
+      setFraudAlerts(await api.getFraudAlerts(cooperativeId));
+    } catch {
+      setFraudAlerts(null);
     }
   }
 
@@ -152,6 +161,23 @@ export default function ReportsSection({ cooperativeId }: { cooperativeId: strin
           points={trends.map((t) => ({ month: t.month, value: t.newMembers }))}
         />
       </div>
+
+      {fraudAlerts && (
+        <div className="border-t border-black/[.08] pt-4 dark:border-white/[.145]">
+          <h3 className="text-sm font-medium text-black dark:text-zinc-50">Fraud alerts (last 30 days)</h3>
+          <ul className="space-y-1 pt-1 text-xs">
+            {fraudAlerts.map((f, i) => (
+              <li key={i} className="flex items-center justify-between">
+                <span className="text-red-600 dark:text-red-400">
+                  {f.type} — {f.member} ({f.accountNumber})
+                </span>
+                <span className="text-zinc-500">{f.description}</span>
+              </li>
+            ))}
+            {fraudAlerts.length === 0 && <li className="text-zinc-500">No signals detected.</li>}
+          </ul>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-black/[.08] pt-4 dark:border-white/[.145]">
         <button

@@ -19,6 +19,7 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import { PdfService } from '../pdf/pdf.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AccountingService } from '../accounting/accounting.service';
+import { AiService } from '../ai/ai.service';
 import { toCsv } from './csv.util';
 
 const DOCUMENT_METADATA_SELECT = {
@@ -54,6 +55,7 @@ export class ReportsService {
     private readonly pdf: PdfService,
     private readonly notifications: NotificationsService,
     private readonly accounting: AccountingService,
+    private readonly ai: AiService,
   ) {}
 
   async computeDashboard(cooperativeId: string) {
@@ -370,10 +372,26 @@ export class ReportsService {
       );
     }
 
+    let narrative: string | undefined;
+    try {
+      narrative = await this.ai.generateReportNarrative(
+        cooperative.name,
+        period,
+        dashboard,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `AI narrative unavailable for cooperative ${cooperativeId}'s ${period} report: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+
     const pdf = await this.pdf.generateDashboardReportPdf({
       cooperativeName: cooperative.name,
       period,
       summary: dashboard,
+      narrative,
     });
 
     const document = await this.prisma.document.create({
