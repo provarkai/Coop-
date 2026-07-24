@@ -4,6 +4,7 @@ import '../api/api_client.dart';
 import '../api/models.dart';
 import '../state/session.dart';
 import '../widgets/common.dart';
+import 'create_meeting_screen.dart';
 
 class MeetingsScreen extends StatefulWidget {
   const MeetingsScreen({super.key});
@@ -34,11 +35,19 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
   Future<void> _rsvp(Meeting meeting, String status) async {
     final session = context.read<Session>();
     try {
-      await session.api.rsvpToMeeting(session.activeCooperative!.id, meeting.id, status);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('RSVP recorded: $status')));
+      await session.api.rsvpToMeeting(
+        session.activeCooperative!.id,
+        meeting.id,
+        status,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('RSVP recorded: $status')));
+      }
       _refresh();
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
     }
   }
 
@@ -51,60 +60,90 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: _refresh,
-      child: FutureBuilder<List<Meeting>>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return ErrorBanner(message: 'Could not load meetings: ${snapshot.error}');
-          }
-          final meetings = snapshot.data ?? [];
-          if (meetings.isEmpty) {
-            return ListView(
-              children: const [Padding(padding: EdgeInsets.all(24), child: Text('No meetings scheduled.'))],
-            );
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: meetings.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, i) {
-              final meeting = meetings[i];
-              return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(meeting.title, style: Theme.of(context).textTheme.titleMedium),
-                      Text('${meeting.type} · ${_formatDate(meeting.scheduledAt)}'),
-                      if (meeting.location != null) Text(meeting.location!),
-                      Text('Status: ${meeting.status}'),
-                      if (meeting.status == 'SCHEDULED')
-                        Row(
-                          children: [
-                            TextButton(
-                              onPressed: () => _rsvp(meeting, 'CONFIRMED'),
-                              child: const Text('RSVP yes'),
-                            ),
-                            TextButton(
-                              onPressed: () => _rsvp(meeting, 'DECLINED'),
-                              child: const Text('RSVP no'),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
+    final session = context.watch<Session>();
+    return Scaffold(
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: FutureBuilder<List<Meeting>>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return ErrorBanner(
+                message: 'Could not load meetings: ${snapshot.error}',
               );
-            },
-          );
-        },
+            }
+            final meetings = snapshot.data ?? [];
+            if (meetings.isEmpty) {
+              return ListView(
+                children: const [
+                  Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text('No meetings scheduled.'),
+                  ),
+                ],
+              );
+            }
+            return ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: meetings.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, i) {
+                final meeting = meetings[i];
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          meeting.title,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        Text(
+                          '${meeting.type} · ${_formatDate(meeting.scheduledAt)}',
+                        ),
+                        if (meeting.location != null) Text(meeting.location!),
+                        Text('Status: ${meeting.status}'),
+                        if (meeting.status == 'SCHEDULED')
+                          Row(
+                            children: [
+                              TextButton(
+                                onPressed: () => _rsvp(meeting, 'CONFIRMED'),
+                                child: const Text('RSVP yes'),
+                              ),
+                              TextButton(
+                                onPressed: () => _rsvp(meeting, 'DECLINED'),
+                                child: const Text('RSVP no'),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
+      floatingActionButton: session.isGovernance
+          ? FloatingActionButton(
+              key: const Key('create-meeting-fab'),
+              tooltip: 'Schedule meeting',
+              onPressed: () async {
+                final created = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => const CreateMeetingScreen(),
+                  ),
+                );
+                if (created == true) _refresh();
+              },
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 }

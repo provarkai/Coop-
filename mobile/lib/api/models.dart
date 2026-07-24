@@ -100,6 +100,33 @@ class SavingsAccount {
       );
 }
 
+class SavingsProduct {
+  final String id;
+  final String name;
+  final String code;
+  final String interestRatePercent;
+  final String minimumBalance;
+  final bool isActive;
+
+  SavingsProduct({
+    required this.id,
+    required this.name,
+    required this.code,
+    required this.interestRatePercent,
+    required this.minimumBalance,
+    required this.isActive,
+  });
+
+  factory SavingsProduct.fromJson(Map<String, dynamic> json) => SavingsProduct(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        code: json['code'] as String,
+        interestRatePercent: json['interestRatePercent'] as String,
+        minimumBalance: json['minimumBalance'] as String,
+        isActive: json['isActive'] as bool,
+      );
+}
+
 class SavingsTransaction {
   final String id;
   final String type;

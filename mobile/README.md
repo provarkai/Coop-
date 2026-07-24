@@ -15,7 +15,9 @@ to the same NestJS API the web app (`../frontend`) uses.
   Role is inferred the same way the web app handles it: try the governance-only endpoint, and
   treat a 403 as "this is a plain member."
 - **Savings / Loans / Meetings:** members see and act on their own data (apply for a loan, RSVP to
-  a meeting); governance sees the cooperative-wide list with approve/reject/disburse actions.
+  a meeting); governance sees the cooperative-wide list with approve/reject/disburse actions, plus
+  can create new meetings (title, type, date/time, location, agenda items) and new savings/loan
+  products (via a "manage products" icon in each tab's app bar).
 - **Members:** governance-only tab to approve/reject pending applications.
 - **Notifications:** the Sprint 9 simulated multi-channel log (email/SMS/WhatsApp/push) — nothing
   is really sent to a device or inbox, it's a logged record members can see, exactly like the web

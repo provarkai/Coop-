@@ -4,6 +4,7 @@ import '../api/api_client.dart';
 import '../api/models.dart';
 import '../state/session.dart';
 import '../widgets/common.dart';
+import 'loan_products_screen.dart';
 
 class LoansScreen extends StatefulWidget {
   const LoansScreen({super.key});
@@ -40,7 +41,9 @@ class _LoansScreenState extends State<LoansScreen> {
       await action();
       await _refresh();
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
     }
   }
 
@@ -62,6 +65,23 @@ class _LoansScreenState extends State<LoansScreen> {
   Widget build(BuildContext context) {
     final session = context.watch<Session>();
     return Scaffold(
+      appBar: session.isGovernance
+          ? AppBar(
+              title: const Text('Loans'),
+              actions: [
+                IconButton(
+                  key: const Key('manage-loan-products-button'),
+                  icon: const Icon(Icons.tune),
+                  tooltip: 'Manage loan products',
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const LoanProductsScreen(),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : null,
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: FutureBuilder<List<Loan>>(
@@ -71,12 +91,19 @@ class _LoansScreenState extends State<LoansScreen> {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return ErrorBanner(message: 'Could not load loans: ${snapshot.error}');
+              return ErrorBanner(
+                message: 'Could not load loans: ${snapshot.error}',
+              );
             }
             final loans = snapshot.data ?? [];
             if (loans.isEmpty) {
               return ListView(
-                children: const [Padding(padding: EdgeInsets.all(24), child: Text('No loans yet.'))],
+                children: const [
+                  Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text('No loans yet.'),
+                  ),
+                ],
               );
             }
             return ListView.separated(
@@ -94,34 +121,61 @@ class _LoansScreenState extends State<LoansScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(formatNaira(loan.principal), style: Theme.of(context).textTheme.titleMedium),
+                            Text(
+                              formatNaira(loan.principal),
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
                             Chip(
                               label: Text(loan.status),
-                              backgroundColor: _statusColor(loan.status).withValues(alpha: 0.15),
-                              labelStyle: TextStyle(color: _statusColor(loan.status)),
+                              backgroundColor: _statusColor(
+                                loan.status,
+                              ).withValues(alpha: 0.15),
+                              labelStyle: TextStyle(
+                                color: _statusColor(loan.status),
+                              ),
                             ),
                           ],
                         ),
                         if (loan.memberName != null) Text(loan.memberName!),
-                        Text('${loan.termMonths} months · outstanding ${formatNaira(loan.outstandingBalance)}'),
+                        Text(
+                          '${loan.termMonths} months · outstanding ${formatNaira(loan.outstandingBalance)}',
+                        ),
                         if (loan.rejectionReason != null)
-                          Text('Rejected: ${loan.rejectionReason}', style: const TextStyle(color: Colors.red)),
+                          Text(
+                            'Rejected: ${loan.rejectionReason}',
+                            style: const TextStyle(color: Colors.red),
+                          ),
                         if (session.isGovernance && loan.status == 'PENDING')
                           Row(
                             children: [
                               TextButton(
-                                onPressed: () => _act(() => session.api.approveLoan(session.activeCooperative!.id, loan.id)),
+                                onPressed: () => _act(
+                                  () => session.api.approveLoan(
+                                    session.activeCooperative!.id,
+                                    loan.id,
+                                  ),
+                                ),
                                 child: const Text('Approve'),
                               ),
                               TextButton(
-                                onPressed: () => _act(() => session.api.rejectLoan(session.activeCooperative!.id, loan.id)),
+                                onPressed: () => _act(
+                                  () => session.api.rejectLoan(
+                                    session.activeCooperative!.id,
+                                    loan.id,
+                                  ),
+                                ),
                                 child: const Text('Reject'),
                               ),
                             ],
                           ),
                         if (session.isGovernance && loan.status == 'APPROVED')
                           TextButton(
-                            onPressed: () => _act(() => session.api.disburseLoan(session.activeCooperative!.id, loan.id)),
+                            onPressed: () => _act(
+                              () => session.api.disburseLoan(
+                                session.activeCooperative!.id,
+                                loan.id,
+                              ),
+                            ),
                             child: const Text('Disburse'),
                           ),
                       ],
@@ -137,6 +191,7 @@ class _LoansScreenState extends State<LoansScreen> {
           ? null
           : FloatingActionButton(
               key: const Key('apply-loan-fab'),
+              tooltip: 'Apply for a loan',
               onPressed: () async {
                 final applied = await Navigator.of(context).push<bool>(
                   MaterialPageRoute(builder: (_) => const ApplyLoanScreen()),
@@ -167,7 +222,9 @@ class _ApplyLoanScreenState extends State<ApplyLoanScreen> {
   @override
   void initState() {
     super.initState();
-    _productsFuture = context.read<Session>().api.listLoanProducts(context.read<Session>().activeCooperative!.id);
+    _productsFuture = context.read<Session>().api.listLoanProducts(
+      context.read<Session>().activeCooperative!.id,
+    );
   }
 
   Future<void> _submit() async {
@@ -187,7 +244,12 @@ class _ApplyLoanScreenState extends State<ApplyLoanScreen> {
     });
     final session = context.read<Session>();
     try {
-      await session.api.applyForLoan(session.activeCooperative!.id, _selected!.id, principal, term);
+      await session.api.applyForLoan(
+        session.activeCooperative!.id,
+        _selected!.id,
+        principal,
+        term,
+      );
       if (mounted) Navigator.of(context).pop(true);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
@@ -214,22 +276,38 @@ class _ApplyLoanScreenState extends State<ApplyLoanScreen> {
               children: [
                 DropdownButtonFormField<LoanProduct>(
                   initialValue: _selected,
-                  decoration: const InputDecoration(labelText: 'Loan product', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    labelText: 'Loan product',
+                    border: OutlineInputBorder(),
+                  ),
                   items: products
-                      .map((p) => DropdownMenuItem(value: p, child: Text('${p.name} (max ${formatNaira(p.maxAmount)})')))
+                      .map(
+                        (p) => DropdownMenuItem(
+                          value: p,
+                          child: Text(
+                            '${p.name} (max ${formatNaira(p.maxAmount)})',
+                          ),
+                        ),
+                      )
                       .toList(),
                   onChanged: (v) => setState(() => _selected = v),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _amountController,
-                  decoration: const InputDecoration(labelText: 'Amount requested (₦)', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    labelText: 'Amount requested (₦)',
+                    border: OutlineInputBorder(),
+                  ),
                   keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _termController,
-                  decoration: const InputDecoration(labelText: 'Term (months)', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    labelText: 'Term (months)',
+                    border: OutlineInputBorder(),
+                  ),
                   keyboardType: TextInputType.number,
                 ),
                 if (_error != null) ...[
@@ -240,7 +318,11 @@ class _ApplyLoanScreenState extends State<ApplyLoanScreen> {
                 FilledButton(
                   onPressed: _loading ? null : _submit,
                   child: _loading
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : const Text('Submit application'),
                 ),
               ],
