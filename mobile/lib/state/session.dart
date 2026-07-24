@@ -3,6 +3,12 @@ import '../api/api_client.dart';
 import '../api/models.dart';
 import '../api/ncms_api.dart';
 
+// Matches the backend's EXCO_ROLES (roles.constants.ts) -- every non-MEMBER cooperative
+// role, all of which now have at least read access to the dashboard and cooperative-wide
+// savings/loans lists. Write actions (approve/disburse/create product/etc.) are still
+// enforced by the backend's narrower per-module MANAGE_* role lists regardless of what
+// this flag shows; a role without write access sees the same buttons but gets a rejected
+// request back, same as any other 403.
 const governanceRoles = {
   'COOPERATIVE_ADMIN',
   'CHAIRMAN',
@@ -10,6 +16,7 @@ const governanceRoles = {
   'TREASURER',
   'AUDITOR',
   'LOAN_OFFICER',
+  'COMMITTEE_MEMBER',
 };
 
 class Session extends ChangeNotifier {

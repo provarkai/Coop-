@@ -10,14 +10,19 @@ to the same NestJS API the web app (`../frontend`) uses.
   refresh-on-401. MFA-required logins prompt for a 6-digit code, same as the web app.
 - **Cooperative picker**, then a bottom-nav shell: Dashboard, Savings, Loans, Meetings,
   Notifications, and (governance roles only) Members.
-- **Dashboard:** governance roles (`COOPERATIVE_ADMIN`, `CHAIRMAN`, `SECRETARY`, `TREASURER`,
-  `AUDITOR`, `LOAN_OFFICER`) see the Sprint 10 KPI tiles; a plain member sees a simpler summary.
-  Role is inferred the same way the web app handles it: try the governance-only endpoint, and
-  treat a 403 as "this is a plain member."
+- **Dashboard:** any exco role (`COMMITTEE_MEMBER`, `LOAN_OFFICER`, `AUDITOR`, `TREASURER`,
+  `SECRETARY`, `CHAIRMAN`, `COOPERATIVE_ADMIN`) sees the Sprint 10 KPI tiles; a plain member sees
+  a simpler summary. Role is inferred the same way the web app handles it: try the
+  governance-only endpoint, and treat a 403 as "this is a plain member." Note this is coarser
+  than the backend's actual permissions: every exco role sees the same cooperative-wide
+  lists/action buttons on mobile (view and manage aren't distinguished per role here the way the
+  backend's per-module role lists do), so a role without write access on a given action still
+  sees the button -- tapping it just gets the same 403 back the backend would give anyone else
+  without that specific permission.
 - **Savings / Loans / Meetings:** members see and act on their own data (apply for a loan, RSVP to
-  a meeting); governance sees the cooperative-wide list with approve/reject/disburse actions, plus
-  can create new meetings (title, type, date/time, location, agenda items) and new savings/loan
-  products (via a "manage products" icon in each tab's app bar).
+  a meeting); any exco role sees the cooperative-wide list with approve/reject/disburse actions,
+  plus can create new meetings (title, type, date/time, location, agenda items) and new
+  savings/loan products (via a "manage products" icon in each tab's app bar).
 - **Members:** governance-only tab to approve/reject pending applications.
 - **Notifications:** the Sprint 9 simulated multi-channel log (email/SMS/WhatsApp/push) — nothing
   is really sent to a device or inbox, it's a logged record members can see, exactly like the web
