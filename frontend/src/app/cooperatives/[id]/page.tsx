@@ -536,7 +536,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
 
   return (
     <div className="w-full flex-1 bg-zinc-50 px-4 py-10 dark:bg-black">
-      <div className="mx-auto flex w-full max-w-5xl items-start gap-6">
+      <div className="mx-auto flex w-full max-w-5xl flex-col items-start gap-6 sm:flex-row">
         <Sidebar />
         <div className="w-full max-w-2xl flex-1 space-y-6">
       <div>

@@ -7,6 +7,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { AiClientService } from '../src/ai/ai-client.service';
 
 const MOCK_ANSWER = 'MOCK AI RESPONSE';
+const chatMock = jest.fn().mockResolvedValue(MOCK_ANSWER);
 
 describe('AI Features (e2e)', () => {
   let app: INestApplication<App>;
@@ -41,7 +42,7 @@ describe('AI Features (e2e)', () => {
       imports: [AppModule],
     })
       .overrideProvider(AiClientService)
-      .useValue({ chat: () => Promise.resolve(MOCK_ANSWER) })
+      .useValue({ chat: chatMock })
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -99,6 +100,35 @@ describe('AI Features (e2e)', () => {
       .send({ question: 'What is my savings balance?' })
       .expect(201);
     expect(res.body.answer).toBe(MOCK_ANSWER);
+  });
+
+  it("includes the cooperative-wide dashboard in governance's context, but not a plain member's", async () => {
+    chatMock.mockClear();
+    await request(app.getHttpServer())
+      .post(`/cooperatives/${cooperativeId}/ai/assistant`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ question: 'How many active members do we have?' })
+      .expect(201);
+    const adminSystemPrompt = chatMock.mock.calls[0][0][0].content as string;
+    expect(adminSystemPrompt).toContain(
+      'this member\'s own data plus the cooperative-wide dashboard',
+    );
+    expect(adminSystemPrompt).toContain(
+      '--- Cooperative-wide dashboard (visible to you because your role has dashboard access) ---',
+    );
+    expect(adminSystemPrompt).toContain('Active members: 2');
+    expect(adminSystemPrompt).toMatch(/Cash balance: 0\.00/);
+
+    chatMock.mockClear();
+    await request(app.getHttpServer())
+      .post(`/cooperatives/${cooperativeId}/ai/assistant`)
+      .set('Authorization', `Bearer ${memberToken}`)
+      .send({ question: 'How many active members do we have?' })
+      .expect(201);
+    const memberSystemPrompt = chatMock.mock.calls[0][0][0].content as string;
+    expect(memberSystemPrompt).toContain("this specific member's own data");
+    expect(memberSystemPrompt).not.toContain('Cooperative-wide dashboard');
+    expect(memberSystemPrompt).not.toContain('Active members:');
   });
 
   it('lets governance summarize a meeting, persisting the AI summary', async () => {

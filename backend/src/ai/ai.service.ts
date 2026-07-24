@@ -4,14 +4,21 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  LoanLedgerEntryType,
+  LoanStatus,
   MeetingStatus,
   MembershipStatus,
+  PaymentStatus,
   Prisma,
+  ResolutionStatus,
   Role,
+  SavingsAccountStatus,
   VoteChoice,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { AccountingService } from '../accounting/accounting.service';
+import { VIEW_DASHBOARD_ROLES } from '../cooperatives/roles.constants';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AiClientService } from './ai-client.service';
 import { AskAssistantDto } from './dto/ask-assistant.dto';
@@ -36,7 +43,93 @@ export class AiService {
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
     private readonly aiClient: AiClientService,
+    private readonly accounting: AccountingService,
   ) {}
+
+  /**
+   * Mirrors ReportsService.computeDashboard's queries directly (rather than depending on
+   * ReportsModule, which already depends on AiModule for report narratives -- importing back
+   * would be a circular module dependency) so a governance caller's assistant answers can draw
+   * on exactly the same cooperative-wide numbers the dashboard shows them.
+   */
+  private async buildGovernanceContext(
+    cooperativeId: string,
+  ): Promise<string[]> {
+    const now = new Date();
+    const monthStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+    );
+    const monthEnd = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+    );
+
+    const [
+      activeMembers,
+      pendingApplications,
+      savingsAgg,
+      loansAgg,
+      disbursedAgg,
+      paymentsAgg,
+      openResolutions,
+      trialBalance,
+      incomeStatement,
+    ] = await Promise.all([
+      this.prisma.cooperativeMembership.count({
+        where: { cooperativeId, status: MembershipStatus.ACTIVE },
+      }),
+      this.prisma.cooperativeMembership.count({
+        where: { cooperativeId, status: MembershipStatus.PENDING },
+      }),
+      this.prisma.savingsAccount.aggregate({
+        where: { cooperativeId, status: SavingsAccountStatus.ACTIVE },
+        _sum: { balance: true },
+      }),
+      this.prisma.loan.aggregate({
+        where: { cooperativeId, status: LoanStatus.ACTIVE },
+        _sum: { outstandingBalance: true },
+      }),
+      this.prisma.loanLedgerEntry.aggregate({
+        where: {
+          type: LoanLedgerEntryType.DISBURSEMENT,
+          createdAt: { gte: monthStart, lt: monthEnd },
+          loan: { cooperativeId },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.payment.aggregate({
+        where: {
+          cooperativeId,
+          status: PaymentStatus.SUCCESS,
+          completedAt: { gte: monthStart, lt: monthEnd },
+        },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+      this.prisma.resolution.count({
+        where: {
+          status: ResolutionStatus.PROPOSED,
+          meeting: { cooperativeId },
+        },
+      }),
+      this.accounting.getTrialBalance(cooperativeId),
+      this.accounting.getIncomeStatement(cooperativeId),
+    ]);
+
+    const cashRow = trialBalance.find((r) => r.account.code === '1000');
+    const cashBalance = cashRow ? cashRow.balance : new Prisma.Decimal(0);
+
+    return [
+      `Active members: ${activeMembers}`,
+      `Pending membership applications: ${pendingApplications}`,
+      `Total savings balance across all members: ${(savingsAgg._sum.balance ?? new Prisma.Decimal(0)).toFixed(2)}`,
+      `Total outstanding loan balance across all members: ${(loansAgg._sum.outstandingBalance ?? new Prisma.Decimal(0)).toFixed(2)}`,
+      `Loans disbursed this month: ${(disbursedAgg._sum.amount ?? new Prisma.Decimal(0)).toFixed(2)}`,
+      `Payments this month: ${paymentsAgg._count._all} totaling ${(paymentsAgg._sum.amount ?? new Prisma.Decimal(0)).toFixed(2)}`,
+      `Open resolutions awaiting a vote: ${openResolutions}`,
+      `Cash balance: ${cashBalance.toFixed(2)}`,
+      `Income statement: total income ${incomeStatement.totalIncome.toFixed(2)}, total expense ${incomeStatement.totalExpense.toFixed(2)}, net surplus ${incomeStatement.netSurplus.toFixed(2)}`,
+    ];
+  }
 
   async askAssistant(
     cooperativeId: string,
@@ -70,6 +163,11 @@ export class AiService {
       select: { title: true, type: true, scheduledAt: true },
     });
 
+    const isGovernance = Boolean(
+      membership &&
+      (VIEW_DASHBOARD_ROLES as readonly Role[]).includes(membership.role),
+    );
+
     const contextLines: string[] = [`Cooperative: ${cooperative.name}`];
     if (membership) {
       contextLines.push(
@@ -91,11 +189,21 @@ export class AiService {
         `Upcoming meeting: "${m.title}" (${m.type}) at ${m.scheduledAt.toISOString()}`,
       );
     }
+    if (isGovernance) {
+      contextLines.push(
+        '--- Cooperative-wide dashboard (visible to you because your role has dashboard access) ---',
+      );
+      contextLines.push(...(await this.buildGovernanceContext(cooperativeId)));
+    }
+
+    const scopeDescription = isGovernance
+      ? "this member's own data plus the cooperative-wide dashboard numbers their governance role already has access to"
+      : "this specific member's own data";
 
     const answer = await this.aiClient.chat([
       {
         role: 'system',
-        content: `You are a helpful assistant for a member of a Nigerian cooperative society. Answer ONLY using the context below, which is this specific member's own data. Be concise (2-4 sentences). Never invent numbers not present in the context; if you don't have the data to answer, say so plainly.\n\nContext:\n${contextLines.join('\n')}`,
+        content: `You are a helpful assistant for a member of a Nigerian cooperative society. Answer ONLY using the context below, which is ${scopeDescription}. Be concise (2-4 sentences). Never invent numbers not present in the context; if you don't have the data to answer, say so plainly.\n\nContext:\n${contextLines.join('\n')}`,
       },
       { role: 'user', content: dto.question },
     ]);
