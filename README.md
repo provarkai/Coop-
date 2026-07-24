@@ -15,8 +15,9 @@ See [`docs/PRD.md`](docs/PRD.md), [`docs/SDD.md`](docs/SDD.md), [`docs/ROADMAP.m
 - **Sprint 5 (Loan Management):** done. Configurable loan products (rate, max amount/term, penalty rate, required guarantor count); self-service loan applications; per-loan guarantor nomination and guarantor sign-off (with a dedicated endpoint so a nominated guarantor can discover and act on their own pending requests); governance approval (gated on enough approved guarantors) and rejection; disbursement that generates an equal-installment repayment schedule; repayment recording that allocates oldest-installment-first and completes the loan once paid off; and late-payment penalty assessment on overdue installments — with a matching Next.js UI (loan products, a self-service "My loans" + application form, a "Guarantor requests" inbox, and a governance-facing loan ledger with approve/reject/disburse/repay/penalize actions and schedule/ledger drill-down).
 - **Sprint 6 (Payments):** done. A simulated payment gateway (no real money movement or provider keys) for self-service savings contributions and loan repayments — a member initiates a payment against their own savings account or active loan, then a "callback" (simulated here in place of a real gateway webhook, triggerable by the payer or by governance) settles it, applying the deposit/repayment automatically on success or leaving the ledger untouched on failure. Includes cooperative-wide reconciliation (filterable by status) and per-member transaction history — with a matching Next.js UI ("Make a payment", "My payments", and a governance-facing reconciliation ledger).
 - **Sprint 7 (Accounting):** done. A double-entry ledger — a per-cooperative chart of accounts (auto-seeded with cash, member savings, loans receivable, interest/penalty income, and savings interest expense), manual journal entries (must balance debits and credits), and automatic postings from savings and loan activity (deposits/withdrawals/interest against cash and member savings; disbursements against loans receivable; repayments split into principal and interest portions; penalties against penalty income) so the books stay in sync with the rest of the app without extra data entry. Includes trial balance, income statement, and balance sheet reports, plus simple per-account/period budgeting with variance reporting — with a matching Next.js UI (chart of accounts, journal entries with a manual-entry form, trial balance, income statement, balance sheet, and budgets).
+- **Sprint 8 (Meetings & Governance):** done. Meeting scheduling (AGM/board/committee/special) with an ordered agenda, auto-inviting every active member as an attendee; self-service RSVP and governance-recorded attendance; member-proposed resolutions (optionally tied to an agenda item) with one vote per member (FOR/AGAINST/ABSTAIN, changeable while open), governance tallying on close (FOR > AGAINST passes, ties and everything else reject), and withdrawal by the proposer or governance; meeting minutes recording, which marks the meeting COMPLETED — with a matching Next.js UI. All meeting times are entered and displayed in West Africa Time (WAT, UTC+1, Nigeria has no DST) regardless of the viewer's own timezone.
 
-See the Playbook for the remaining sprint sequence, starting with Sprint 8 (Meetings & Governance).
+See the Playbook for the remaining sprint sequence, starting with Sprint 9 (Documents & Communication).
 
 ## Structure
 
@@ -185,6 +186,26 @@ Restricted to governance/treasurer/auditor — there's no member self-service vi
 | `POST\|GET /cooperatives/:id/accounting/budgets` | Set a per-account/period planned amount, or list budgets (optional `?period=`) with actual and variance |
 
 Savings deposits/withdrawals/interest and loan disbursements/repayments/penalties are posted automatically (see `AccountingService.postSavings*`/`postLoan*` in `backend/src/accounting/accounting.service.ts`) — no manual bookkeeping needed for activity that happens elsewhere in the app.
+
+## Meetings & Governance API
+
+Scheduling, updating, recording minutes, and recording another member's attendance are restricted to `COOPERATIVE_ADMIN`/`CHAIRMAN`/`SECRETARY`. Viewing, RSVPing, proposing resolutions, and voting are open to any active member (self-service). Withdrawing a resolution is allowed for its proposer or governance. All `scheduledAt` values are ISO 8601 UTC instants over the wire; the frontend converts to/from West Africa Time (WAT, UTC+1) for entry and display.
+
+| Endpoint | Description |
+| --- | --- |
+| `POST /cooperatives/:id/meetings` | Schedule a meeting (title, type, `scheduledAt`, location, optional ordered agenda items); auto-invites every active member as an `INVITED` attendee |
+| `GET /cooperatives/:id/meetings` | List meetings for the cooperative (any active member) |
+| `GET /cooperatives/:id/meetings/:meetingId` | Meeting detail with agenda, attendance, and resolutions (any active member) |
+| `PATCH /cooperatives/:id/meetings/:meetingId` | Update title/type/`scheduledAt`/location/status |
+| `POST /cooperatives/:id/meetings/:meetingId/minutes` | Record minutes; marks the meeting `COMPLETED` |
+| `POST /cooperatives/:id/meetings/:meetingId/rsvp` | Self-service RSVP (`CONFIRMED`/`DECLINED`) |
+| `GET /cooperatives/:id/meetings/:meetingId/attendance` | List attendance (any active member) |
+| `POST /cooperatives/:id/meetings/:meetingId/attendance/:userId` | Record another member's attendance (`ATTENDED`/`ABSENT`/`EXCUSED`) |
+| `POST /cooperatives/:id/meetings/:meetingId/resolutions` | Propose a resolution, optionally tied to an agenda item (any active member) |
+| `GET /cooperatives/:id/meetings/:meetingId/resolutions` | List resolutions with vote tallies (any active member) |
+| `POST /cooperatives/:id/meetings/:meetingId/resolutions/:resolutionId/vote` | Cast or change a vote (`FOR`/`AGAINST`/`ABSTAIN`) — one per active member while the resolution is `PROPOSED` |
+| `POST /cooperatives/:id/meetings/:meetingId/resolutions/:resolutionId/close` | Tally votes and close — `FOR` > `AGAINST` passes, otherwise (including ties) rejects |
+| `POST /cooperatives/:id/meetings/:meetingId/resolutions/:resolutionId/withdraw` | Withdraw a still-open resolution (proposer or governance) |
 
 ## CI
 

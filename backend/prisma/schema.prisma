@@ -15,6 +15,9 @@
 // accounts, manual journal entries, automatic postings from savings/
 // loan activity, trial balance/income statement/balance sheet
 // reports, and simple per-account budgeting.
+// Sprint 8: meeting scheduling with agendas, member RSVP and
+// governance-recorded attendance, resolutions with member voting and
+// governance tallying, and meeting minutes.
 
 generator client {
   provider = "prisma-client-js"
@@ -71,6 +74,10 @@ model User {
   loanGuarantorFor            LoanGuarantor[]
   loanLedgerEntriesRecorded   LoanLedgerEntry[]
   journalEntriesPosted        JournalEntry[]
+  meetingsCreated             Meeting[]               @relation("MeetingCreator")
+  meetingMinutesRecorded      Meeting[]               @relation("MeetingMinutesRecorder")
+  meetingAttendances          Attendance[]
+  resolutionsProposed         Resolution[]            @relation("ResolutionProposer")
 }
 
 model RefreshToken {
@@ -134,6 +141,7 @@ model Cooperative {
   accounts          Account[]
   journalEntries    JournalEntry[]
   budgets           Budget[]
+  meetings          Meeting[]
 }
 
 model Branch {
@@ -196,6 +204,7 @@ model CooperativeMembership {
   savingsAccounts SavingsAccount[]
   loans           Loan[]
   payments        Payment[]
+  votes           Vote[]
 
   @@unique([cooperativeId, userId])
   @@unique([cooperativeId, membershipNumber])
@@ -574,4 +583,123 @@ model Budget {
   updatedAt     DateTime    @updatedAt
 
   @@unique([accountId, period])
+}
+
+enum MeetingType {
+  AGM
+  BOARD
+  COMMITTEE
+  SPECIAL
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  INVITED
+  CONFIRMED
+  DECLINED
+  ATTENDED
+  ABSENT
+  EXCUSED
+}
+
+enum ResolutionStatus {
+  PROPOSED
+  PASSED
+  REJECTED
+  WITHDRAWN
+}
+
+enum VoteChoice {
+  FOR
+  AGAINST
+  ABSTAIN
+}
+
+model Meeting {
+  id                      String        @id @default(cuid())
+  cooperativeId           String
+  cooperative             Cooperative   @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  title                   String
+  type                    MeetingType   @default(SPECIAL)
+  scheduledAt             DateTime
+  location                String?
+  status                  MeetingStatus @default(SCHEDULED)
+  minutes                 String?
+  minutesRecordedByUserId String?
+  minutesRecordedBy       User?         @relation("MeetingMinutesRecorder", fields: [minutesRecordedByUserId], references: [id])
+  createdByUserId         String
+  createdBy               User          @relation("MeetingCreator", fields: [createdByUserId], references: [id])
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  agendaItems AgendaItem[]
+  attendances Attendance[]
+  resolutions Resolution[]
+
+  @@index([cooperativeId])
+}
+
+model AgendaItem {
+  id          String  @id @default(cuid())
+  meetingId   String
+  meeting     Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  order       Int
+  title       String
+  description String?
+
+  resolutions Resolution[]
+
+  @@index([meetingId])
+}
+
+model Attendance {
+  id          String           @id @default(cuid())
+  meetingId   String
+  meeting     Meeting          @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      AttendanceStatus @default(INVITED)
+  respondedAt DateTime?
+  recordedAt  DateTime?
+
+  @@unique([meetingId, userId])
+}
+
+model Resolution {
+  id               String           @id @default(cuid())
+  meetingId        String
+  meeting          Meeting          @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  agendaItemId     String?
+  agendaItem       AgendaItem?      @relation(fields: [agendaItemId], references: [id])
+  title            String
+  description      String?
+  status           ResolutionStatus @default(PROPOSED)
+  proposedByUserId String
+  proposedBy       User             @relation("ResolutionProposer", fields: [proposedByUserId], references: [id])
+  closedAt         DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  votes Vote[]
+
+  @@index([meetingId])
+}
+
+model Vote {
+  id           String                @id @default(cuid())
+  resolutionId String
+  resolution   Resolution            @relation(fields: [resolutionId], references: [id], onDelete: Cascade)
+  membershipId String
+  membership   CooperativeMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  choice       VoteChoice
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@unique([resolutionId, membershipId])
 }

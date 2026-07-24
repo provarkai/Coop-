@@ -352,6 +352,68 @@ export interface BudgetVsActual {
   variance: string;
 }
 
+export type MeetingType = "AGM" | "BOARD" | "COMMITTEE" | "SPECIAL";
+export type MeetingStatus = "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+export type AttendanceStatus = "INVITED" | "CONFIRMED" | "DECLINED" | "ATTENDED" | "ABSENT" | "EXCUSED";
+export type ResolutionStatus = "PROPOSED" | "PASSED" | "REJECTED" | "WITHDRAWN";
+export type VoteChoice = "FOR" | "AGAINST" | "ABSTAIN";
+
+export interface AgendaItem {
+  id: string;
+  meetingId: string;
+  order: number;
+  title: string;
+  description: string | null;
+}
+
+export interface Attendance {
+  id: string;
+  meetingId: string;
+  userId: string;
+  status: AttendanceStatus;
+  respondedAt: string | null;
+  recordedAt: string | null;
+  user?: { id: string; email: string; firstName: string; lastName: string };
+}
+
+export interface Vote {
+  id: string;
+  resolutionId: string;
+  membershipId: string;
+  choice: VoteChoice;
+}
+
+export interface Resolution {
+  id: string;
+  meetingId: string;
+  agendaItemId: string | null;
+  title: string;
+  description: string | null;
+  status: ResolutionStatus;
+  proposedByUserId: string;
+  closedAt: string | null;
+  createdAt: string;
+  votes: Vote[];
+  proposedBy?: { id: string; email: string; firstName: string; lastName: string };
+}
+
+export interface Meeting {
+  id: string;
+  cooperativeId: string;
+  title: string;
+  type: MeetingType;
+  scheduledAt: string;
+  location: string | null;
+  status: MeetingStatus;
+  minutes: string | null;
+  minutesRecordedByUserId: string | null;
+  createdByUserId: string;
+  createdAt: string;
+  agendaItems: AgendaItem[];
+  attendances?: Attendance[];
+  resolutions?: Resolution[];
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -880,6 +942,98 @@ export const api = {
     request<BudgetVsActual[]>(
       `/cooperatives/${cooperativeId}/accounting/budgets${period ? `?period=${period}` : ""}`,
       { method: "GET" },
+      true,
+    ),
+
+  createMeeting: (
+    cooperativeId: string,
+    data: {
+      title: string;
+      type?: MeetingType;
+      scheduledAt: string;
+      location?: string;
+      agendaItems?: { title: string; description?: string }[];
+    },
+  ) => request<Meeting>(`/cooperatives/${cooperativeId}/meetings`, { method: "POST", body: JSON.stringify(data) }, true),
+
+  listMeetings: (cooperativeId: string) =>
+    request<Meeting[]>(`/cooperatives/${cooperativeId}/meetings`, { method: "GET" }, true),
+
+  getMeeting: (cooperativeId: string, meetingId: string) =>
+    request<Meeting>(`/cooperatives/${cooperativeId}/meetings/${meetingId}`, { method: "GET" }, true),
+
+  updateMeeting: (
+    cooperativeId: string,
+    meetingId: string,
+    data: Partial<{ title: string; type: MeetingType; scheduledAt: string; location: string; status: MeetingStatus }>,
+  ) =>
+    request<Meeting>(
+      `/cooperatives/${cooperativeId}/meetings/${meetingId}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      true,
+    ),
+
+  recordMeetingMinutes: (cooperativeId: string, meetingId: string, minutes: string) =>
+    request<Meeting>(
+      `/cooperatives/${cooperativeId}/meetings/${meetingId}/minutes`,
+      { method: "POST", body: JSON.stringify({ minutes }) },
+      true,
+    ),
+
+  rsvpToMeeting: (cooperativeId: string, meetingId: string, status: "CONFIRMED" | "DECLINED") =>
+    request<Attendance>(
+      `/cooperatives/${cooperativeId}/meetings/${meetingId}/rsvp`,
+      { method: "POST", body: JSON.stringify({ status }) },
+      true,
+    ),
+
+  listMeetingAttendance: (cooperativeId: string, meetingId: string) =>
+    request<Attendance[]>(`/cooperatives/${cooperativeId}/meetings/${meetingId}/attendance`, { method: "GET" }, true),
+
+  recordMeetingAttendance: (
+    cooperativeId: string,
+    meetingId: string,
+    userId: string,
+    status: "ATTENDED" | "ABSENT" | "EXCUSED",
+  ) =>
+    request<Attendance>(
+      `/cooperatives/${cooperativeId}/meetings/${meetingId}/attendance/${userId}`,
+      { method: "POST", body: JSON.stringify({ status }) },
+      true,
+    ),
+
+  proposeResolution: (
+    cooperativeId: string,
+    meetingId: string,
+    data: { agendaItemId?: string; title: string; description?: string },
+  ) =>
+    request<Resolution>(
+      `/cooperatives/${cooperativeId}/meetings/${meetingId}/resolutions`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  listResolutions: (cooperativeId: string, meetingId: string) =>
+    request<Resolution[]>(`/cooperatives/${cooperativeId}/meetings/${meetingId}/resolutions`, { method: "GET" }, true),
+
+  castVote: (cooperativeId: string, meetingId: string, resolutionId: string, choice: VoteChoice) =>
+    request<Vote>(
+      `/cooperatives/${cooperativeId}/meetings/${meetingId}/resolutions/${resolutionId}/vote`,
+      { method: "POST", body: JSON.stringify({ choice }) },
+      true,
+    ),
+
+  closeResolution: (cooperativeId: string, meetingId: string, resolutionId: string) =>
+    request<Resolution>(
+      `/cooperatives/${cooperativeId}/meetings/${meetingId}/resolutions/${resolutionId}/close`,
+      { method: "POST" },
+      true,
+    ),
+
+  withdrawResolution: (cooperativeId: string, meetingId: string, resolutionId: string) =>
+    request<Resolution>(
+      `/cooperatives/${cooperativeId}/meetings/${meetingId}/resolutions/${resolutionId}/withdraw`,
+      { method: "POST" },
       true,
     ),
 };
