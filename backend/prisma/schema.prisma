@@ -23,6 +23,12 @@
 // log (email/SMS/WhatsApp/push) used for governance announcements and
 // automatic meeting-invite notices. PDF generation (membership cards,
 // meeting minutes) is computed on demand and not persisted.
+// Sprint 10: reports & dashboards. KPI summary and month-over-month trend
+// analytics computed on demand from existing data (no new tables). CSV
+// exports of members/savings transactions/loans/journal entries. A
+// scheduled (and manually triggerable) monthly digest that renders a PDF,
+// stores it via the Document repository under a new REPORT category, and
+// notifies members through the existing notification log.
 
 generator client {
   provider = "prisma-client-js"
@@ -720,6 +726,7 @@ enum DocumentCategory {
   FINANCIAL_STATEMENT
   MEETING_MINUTES
   FORM
+  REPORT
   OTHER
 }
 

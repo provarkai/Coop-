@@ -60,3 +60,11 @@ export const VIEW_ACCOUNTING_ROLES = [
   Role.TREASURER,
   Role.AUDITOR,
 ] as const;
+export const VIEW_DASHBOARD_ROLES = [
+  Role.COOPERATIVE_ADMIN,
+  Role.CHAIRMAN,
+  Role.SECRETARY,
+  Role.TREASURER,
+  Role.AUDITOR,
+  Role.LOAN_OFFICER,
+] as const;

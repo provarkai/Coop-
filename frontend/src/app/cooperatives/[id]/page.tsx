@@ -24,6 +24,7 @@ import PaymentsSection from "./PaymentsSection";
 import AccountingSection from "./AccountingSection";
 import MeetingsSection from "./MeetingsSection";
 import CommunicationSection from "./CommunicationSection";
+import ReportsSection from "./ReportsSection";
 
 const FILING_TYPES = ["ANNUAL_RETURN", "FINANCIAL_STATEMENT", "AGM_MINUTES", "OTHER"];
 
@@ -882,6 +883,8 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
       <MeetingsSection cooperativeId={id} me={me} />
 
       <CommunicationSection cooperativeId={id} />
+
+      <ReportsSection cooperativeId={id} />
 
       <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
         <h2 className="font-semibold text-black dark:text-zinc-50">Compliance filings</h2>

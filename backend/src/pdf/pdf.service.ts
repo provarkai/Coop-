@@ -28,6 +28,26 @@ interface MeetingMinutesPdfInput {
   minutes: string | null;
 }
 
+interface DashboardReportPdfInput {
+  cooperativeName: string;
+  period: string;
+  summary: {
+    activeMembers: number;
+    pendingApplications: number;
+    totalSavingsBalance: string;
+    totalOutstandingLoans: string;
+    loansDisbursedThisMonth: string;
+    paymentsThisMonthCount: number;
+    paymentsThisMonthTotal: string;
+    upcomingMeetings: number;
+    openResolutions: number;
+    cashBalance: string;
+    totalIncome: string;
+    totalExpense: string;
+    netSurplus: string;
+  };
+}
+
 @Injectable()
 export class PdfService {
   generateMembershipCardPdf(data: MembershipCardPdfInput): Promise<Buffer> {
@@ -94,6 +114,47 @@ export class PdfService {
       doc.fontSize(14).text('Minutes');
       doc.moveDown(0.5);
       doc.fontSize(11).text(data.minutes ?? 'Not yet recorded.');
+    });
+  }
+
+  generateDashboardReportPdf(data: DashboardReportPdfInput): Promise<Buffer> {
+    return this.render((doc) => {
+      doc
+        .fontSize(18)
+        .text(`Monthly Report — ${data.period}`, { align: 'center' });
+      doc.fontSize(10).text(data.cooperativeName, { align: 'center' });
+      doc.moveDown();
+
+      const s = data.summary;
+      doc.fontSize(14).text('Membership');
+      doc.fontSize(11).text(`Active members: ${s.activeMembers}`);
+      doc.text(`Pending applications: ${s.pendingApplications}`);
+      doc.moveDown();
+
+      doc.fontSize(14).text('Savings & Loans');
+      doc.fontSize(11).text(`Total savings balance: ${s.totalSavingsBalance}`);
+      doc.text(`Total outstanding loans: ${s.totalOutstandingLoans}`);
+      doc.text(`Loans disbursed this month: ${s.loansDisbursedThisMonth}`);
+      doc.moveDown();
+
+      doc.fontSize(14).text('Payments');
+      doc
+        .fontSize(11)
+        .text(
+          `Successful payments this month: ${s.paymentsThisMonthCount} totalling ${s.paymentsThisMonthTotal}`,
+        );
+      doc.moveDown();
+
+      doc.fontSize(14).text('Accounting');
+      doc.fontSize(11).text(`Cash balance: ${s.cashBalance}`);
+      doc.text(`Total income: ${s.totalIncome}`);
+      doc.text(`Total expense: ${s.totalExpense}`);
+      doc.text(`Net surplus: ${s.netSurplus}`);
+      doc.moveDown();
+
+      doc.fontSize(14).text('Governance');
+      doc.fontSize(11).text(`Upcoming meetings: ${s.upcomingMeetings}`);
+      doc.text(`Open resolutions: ${s.openResolutions}`);
     });
   }
 

@@ -17,8 +17,9 @@ See [`docs/PRD.md`](docs/PRD.md), [`docs/SDD.md`](docs/SDD.md), [`docs/ROADMAP.m
 - **Sprint 7 (Accounting):** done. A double-entry ledger — a per-cooperative chart of accounts (auto-seeded with cash, member savings, loans receivable, interest/penalty income, and savings interest expense), manual journal entries (must balance debits and credits), and automatic postings from savings and loan activity (deposits/withdrawals/interest against cash and member savings; disbursements against loans receivable; repayments split into principal and interest portions; penalties against penalty income) so the books stay in sync with the rest of the app without extra data entry. Includes trial balance, income statement, and balance sheet reports, plus simple per-account/period budgeting with variance reporting — with a matching Next.js UI (chart of accounts, journal entries with a manual-entry form, trial balance, income statement, balance sheet, and budgets).
 - **Sprint 8 (Meetings & Governance):** done. Meeting scheduling (AGM/board/committee/special) with an ordered agenda, auto-inviting every active member as an attendee; self-service RSVP and governance-recorded attendance; member-proposed resolutions (optionally tied to an agenda item) with one vote per member (FOR/AGAINST/ABSTAIN, changeable while open), governance tallying on close (FOR > AGAINST passes, ties and everything else reject), and withdrawal by the proposer or governance; meeting minutes recording, which marks the meeting COMPLETED — with a matching Next.js UI. All meeting times are entered and displayed in West Africa Time (WAT, UTC+1, Nigeria has no DST) regardless of the viewer's own timezone.
 - **Sprint 9 (Documents & Communication):** done. A per-cooperative document repository (arbitrary files uploaded and stored as bytes with metadata — title, category, uploader — download returns the exact original bytes with the right filename/content-type); real, on-demand-generated PDFs for the membership card and meeting minutes (no external service — rendered server-side with `pdfkit`); and a multi-channel notification log (email/SMS/WhatsApp/push) for governance announcements broadcast to every active member, plus an automatic (simulated) email notice to every invited member when a meeting is scheduled. Email/SMS/WhatsApp/push sends are **simulated** — no real provider credentials, every attempt is just logged as `SENT` — with a matching Next.js UI (document upload/list/download/delete, an announcement composer, a personal notification log, and "Download PDF" buttons on the membership card and meeting detail views).
+- **Sprint 10 (Reports & Dashboards):** done. An executive KPI dashboard (active members, pending applications, total savings, outstanding loans, this-month loan disbursements/payments, upcoming meetings, open resolutions, cash balance, income/expense/net surplus) and 6-month trend analytics (new members, savings net, loan disbursed/repaid), all computed on demand from existing data — nothing new persisted. CSV exports for members, savings transactions, loans, and journal entries. A monthly digest report — a real generated PDF, stored via the Sprint 9 document repository under a new `REPORT` category, with a (simulated) email notice to every active member — runs automatically on a schedule (`@nestjs/schedule`, 1st of the month) and can also be triggered on demand by governance. Matching Next.js UI: KPI tiles, small trend charts, CSV export buttons, and a "Generate report now" button.
 
-See the Playbook for the remaining sprint sequence, starting with Sprint 10 (Reports & Dashboards).
+See the Playbook for the remaining sprint sequence, starting with Sprint 11 (Mobile Apps).
 
 ## Structure
 
@@ -225,6 +226,22 @@ Uploading and deleting documents, and sending announcements, are restricted to `
 | `GET /cooperatives/:id/notifications/all` | List every notification sent within the cooperative |
 
 Scheduling a meeting automatically sends a simulated `EMAIL` notification to every invited member (see `MeetingsService.createMeeting` in `backend/src/meetings/meetings.service.ts`).
+
+## Reports & Dashboards API
+
+All routes are restricted to governance/treasurer/auditor/loan-officer (`COOPERATIVE_ADMIN`/`CHAIRMAN`/`SECRETARY`/`TREASURER`/`AUDITOR`/`LOAN_OFFICER`) — there's no member self-service view, since this is cooperative-wide financial and operational data. Everything is computed on demand from existing tables; nothing new is persisted except the generated monthly report document itself.
+
+| Endpoint | Description |
+| --- | --- |
+| `GET /cooperatives/:id/dashboard` | KPI summary: active members, pending applications, total savings balance, total outstanding loans, this-month loan disbursements/payments, upcoming meetings, open resolutions, cash balance, total income/expense, net surplus |
+| `GET /cooperatives/:id/dashboard/trends?months=` | Month-over-month series (default 6, max 24): new members, savings net (deposits − withdrawals), loans disbursed, loans repaid |
+| `GET /cooperatives/:id/exports/members.csv` | CSV export of all memberships |
+| `GET /cooperatives/:id/exports/savings-transactions.csv` | CSV export of every savings transaction |
+| `GET /cooperatives/:id/exports/loans.csv` | CSV export of every loan |
+| `GET /cooperatives/:id/exports/journal-entries.csv` | CSV export of every journal line, one row per line |
+| `POST /cooperatives/:id/reports/monthly-digest` | Generate a monthly report now: renders a PDF of the KPI summary, stores it in the Document repository (category `REPORT`), and sends a simulated `EMAIL` notice to every active member — restricted to `COOPERATIVE_ADMIN`/`CHAIRMAN`/`SECRETARY` |
+
+The same monthly digest also runs automatically for every active cooperative on the 1st of each month (`@nestjs/schedule`, see `ReportsService.runScheduledMonthlyDigests` in `backend/src/reports/reports.service.ts`); the endpoint above triggers the identical logic on demand rather than waiting for the schedule.
 
 ## CI
 

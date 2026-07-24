@@ -445,6 +445,31 @@ export interface AppNotification {
   recipient?: { id: string; email: string; firstName: string; lastName: string };
 }
 
+export interface DashboardSummary {
+  activeMembers: number;
+  pendingApplications: number;
+  totalSavingsBalance: string;
+  totalOutstandingLoans: string;
+  loansDisbursedThisMonth: string;
+  paymentsThisMonthCount: number;
+  paymentsThisMonthTotal: string;
+  upcomingMeetings: number;
+  openResolutions: number;
+  cashBalance: string;
+  totalIncome: string;
+  totalExpense: string;
+  netSurplus: string;
+  generatedAt: string;
+}
+
+export interface TrendPoint {
+  month: string;
+  newMembers: number;
+  savingsNet: string;
+  loanDisbursed: string;
+  loanRepaid: string;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -1099,6 +1124,19 @@ export const api = {
 
   listAllNotifications: (cooperativeId: string) =>
     request<AppNotification[]>(`/cooperatives/${cooperativeId}/notifications/all`, { method: "GET" }, true),
+
+  getDashboard: (cooperativeId: string) =>
+    request<DashboardSummary>(`/cooperatives/${cooperativeId}/dashboard`, { method: "GET" }, true),
+
+  getDashboardTrends: (cooperativeId: string, months = 6) =>
+    request<TrendPoint[]>(`/cooperatives/${cooperativeId}/dashboard/trends?months=${months}`, { method: "GET" }, true),
+
+  generateMonthlyDigest: (cooperativeId: string) =>
+    request<DocumentMetadata>(
+      `/cooperatives/${cooperativeId}/reports/monthly-digest`,
+      { method: "POST" },
+      true,
+    ),
 };
 
 /** Fetches a binary file (PDF, document download) with the auth header attached, for triggering a browser save-as. */
