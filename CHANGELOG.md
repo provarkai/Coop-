@@ -1,9 +1,23 @@
 # Changelog
 
+## Unreleased
+
+- **Sprint 11 (Mobile Apps)** — A Flutter app (`mobile/`) for members and
+  administrators, talking to the same NestJS API as the web app: JWT auth
+  with platform-secure token storage and refresh-on-401, a cooperative
+  picker, a role-aware dashboard (governance KPI tiles vs. a plain-member
+  summary), savings/loans/meetings (member self-service plus governance
+  approve/reject/disburse and a member-applications approval tab), and the
+  Sprint 9 simulated multi-channel notification log, including sending a
+  simulated announcement. Verified with `flutter analyze`/`flutter test`
+  plus a real run against the live local backend. Distribution (Play
+  Store/App Store) is a follow-up item — see `mobile/README.md`.
+
 ## v1.0.0 — Initial release
 
-Built sprint-by-sprint per `docs/PLAYBOOK.md`. Sprint 11 (Mobile Apps) is
-deferred until requested; every other sprint is complete.
+Built sprint-by-sprint per `docs/PLAYBOOK.md`. Sprint 11 (Mobile Apps) was
+deferred until requested at the time of this release; every other sprint
+was complete.
 
 - **Sprint 0** — Project setup.
 - **Sprint 1 (Authentication & RBAC)** — Registration, login, JWT
