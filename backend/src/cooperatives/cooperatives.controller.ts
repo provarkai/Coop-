@@ -227,6 +227,31 @@ export class CooperativesController {
     return this.cooperatives.rejectMembership(id, userId, actor);
   }
 
+  @Get(':id/members/:userId/profile')
+  getMemberProfile(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @CurrentUser() requester: AuthenticatedUser,
+  ) {
+    return this.cooperatives.getMemberProfile(id, userId, requester);
+  }
+
+  @Get(':id/members/:userId/avatar')
+  async getMemberAvatar(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @CurrentUser() requester: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const avatar = await this.cooperatives.getMemberAvatar(
+      id,
+      userId,
+      requester,
+    );
+    res.setHeader('Content-Type', avatar.mimeType);
+    res.send(avatar.content);
+  }
+
   @Get(':id/members/:userId/card')
   getMembershipCard(
     @Param('id') id: string,

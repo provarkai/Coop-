@@ -5,12 +5,15 @@ import {
   NotFoundException,
   Param,
   Patch,
+  Res,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
+import type { Response } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { UsersService } from './users.service';
+import { UpdateAvatarDto } from './dto/update-avatar.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 
@@ -37,6 +40,25 @@ export class UsersController {
       dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
     });
     return this.users.toPublicProfile(updated);
+  }
+
+  @Get('me/avatar')
+  async getMyAvatar(
+    @CurrentUser() user: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const avatar = await this.users.getAvatar(user.userId);
+    res.setHeader('Content-Type', avatar.mimeType);
+    res.send(avatar.content);
+  }
+
+  @Patch('me/avatar')
+  async updateMyAvatar(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateAvatarDto,
+  ) {
+    await this.users.updateAvatar(user.userId, dto);
+    return { updated: true };
   }
 
   // Bootstrapping note: the very first SUPER_ADMIN can't be created through

@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, ApiError, getAccessToken, type UserProfile } from "@/lib/api";
+import { api, ApiError, downloadFile, getAccessToken, type UserProfile } from "@/lib/api";
 
 export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -30,6 +32,11 @@ export default function ProfilePage() {
       try {
         const data = await api.getProfile();
         setProfile(data);
+        if (data.avatarMimeType) {
+          downloadFile("/users/me/avatar")
+            .then((blob) => setAvatarUrl(URL.createObjectURL(blob)))
+            .catch(() => setAvatarUrl(null));
+        }
         setForm({
           firstName: data.firstName,
           lastName: data.lastName,
@@ -63,6 +70,27 @@ export default function ProfilePage() {
     }
   }
 
+  async function onUploadAvatar(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarError(null);
+    try {
+      const contentBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      await api.updateMyAvatar({ mimeType: file.type, contentBase64 });
+      const blob = await downloadFile("/users/me/avatar");
+      setAvatarUrl(URL.createObjectURL(blob));
+    } catch (err) {
+      setAvatarError(err instanceof ApiError ? err.message : "Something went wrong");
+    } finally {
+      e.target.value = "";
+    }
+  }
+
   if (!profile) {
     return null;
   }
@@ -75,6 +103,20 @@ export default function ProfilePage() {
       >
         <h1 className="text-xl font-semibold text-black dark:text-zinc-50">My profile (KYC)</h1>
         <p className="text-sm text-zinc-500 dark:text-zinc-500">{profile.email}</p>
+
+        <div className="flex items-center gap-3">
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- authenticated blob URL, not a static asset
+            <img src={avatarUrl} alt="Profile photo" className="h-16 w-16 rounded-full object-cover" />
+          ) : (
+            <div className="h-16 w-16 rounded-full border border-dashed border-black/[.15] dark:border-white/[.2]" />
+          )}
+          <label className="text-sm text-zinc-600 dark:text-zinc-400">
+            Photo
+            <input type="file" accept="image/*" onChange={onUploadAvatar} className="mt-1 block text-sm" />
+          </label>
+        </div>
+        {avatarError && <p className="text-sm text-red-600 dark:text-red-400">{avatarError}</p>}
 
         {message && <p className="text-sm text-zinc-600 dark:text-zinc-400">{message}</p>}
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}

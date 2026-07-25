@@ -174,6 +174,75 @@ describe('Member management (e2e)', () => {
     expect((res.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
   });
 
+  it("returns the member's full profile (KYC + membership info) to self or governance", async () => {
+    const self = await request(app.getHttpServer())
+      .get(`/cooperatives/${cooperativeId}/members/${applicantId}/profile`)
+      .set('Authorization', `Bearer ${applicantToken}`)
+      .expect(200);
+    expect(self.body.membershipNumber).toEqual(expect.any(String));
+    expect(self.body.status).toBe('ACTIVE');
+    expect(self.body.user.email).toBe(applicantEmail);
+    expect(self.body.user).not.toHaveProperty('mfaEnabled');
+
+    const governance = await request(app.getHttpServer())
+      .get(`/cooperatives/${cooperativeId}/members/${applicantId}/profile`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(governance.body.user.email).toBe(applicantEmail);
+  });
+
+  it("denies an outsider access to another member's profile", async () => {
+    await request(app.getHttpServer())
+      .get(`/cooperatives/${cooperativeId}/members/${applicantId}/profile`)
+      .set('Authorization', `Bearer ${outsiderToken}`)
+      .expect(403);
+  });
+
+  it('lets a member upload their own avatar, then fetch it via /users/me/avatar', async () => {
+    const contentBase64 = Buffer.from('fake-avatar-bytes').toString('base64');
+    await request(app.getHttpServer())
+      .patch('/users/me/avatar')
+      .set('Authorization', `Bearer ${applicantToken}`)
+      .send({ mimeType: 'image/png', contentBase64 })
+      .expect(200);
+
+    const res = await request(app.getHttpServer())
+      .get('/users/me/avatar')
+      .set('Authorization', `Bearer ${applicantToken}`)
+      .expect(200);
+    expect(res.headers['content-type']).toBe('image/png');
+    expect(Buffer.from(res.body).toString()).toBe('fake-avatar-bytes');
+
+    // The profile endpoint must reflect that an avatar now exists so the
+    // frontend knows to fetch it -- regression check for the mimetype field
+    // being silently dropped from the response.
+    const profile = await request(app.getHttpServer())
+      .get(`/cooperatives/${cooperativeId}/members/${applicantId}/profile`)
+      .set('Authorization', `Bearer ${applicantToken}`)
+      .expect(200);
+    expect(profile.body.user.avatarMimeType).toBe('image/png');
+  });
+
+  it("lets governance (but not an outsider) fetch a member's avatar via the cooperative-scoped route", async () => {
+    const governance = await request(app.getHttpServer())
+      .get(`/cooperatives/${cooperativeId}/members/${applicantId}/avatar`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(Buffer.from(governance.body).toString()).toBe('fake-avatar-bytes');
+
+    await request(app.getHttpServer())
+      .get(`/cooperatives/${cooperativeId}/members/${applicantId}/avatar`)
+      .set('Authorization', `Bearer ${outsiderToken}`)
+      .expect(403);
+  });
+
+  it('returns 404 for a member with no avatar uploaded', async () => {
+    await request(app.getHttpServer())
+      .get('/users/me/avatar')
+      .set('Authorization', `Bearer ${guarantorToken}`)
+      .expect(404);
+  });
+
   it('lets the member nominate a guarantor, who must confirm before it counts', async () => {
     const nomination = await request(app.getHttpServer())
       .post(`/cooperatives/${cooperativeId}/members/${applicantId}/guarantors`)

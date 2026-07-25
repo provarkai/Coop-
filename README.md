@@ -126,6 +126,9 @@ Write/manage actions stay restricted to the narrower, function-specific role lis
 | `GET /cooperatives/:id/preview` | Cooperative name/slug only, visible to non-members (used by the join flow) |
 | `POST /cooperatives/:id/apply` | Apply for membership as `PENDING` |
 | `POST /cooperatives/:id/members/:userId/approve` \| `/reject` | Governance-only; approving assigns a membership number |
+| `GET /cooperatives/:id/members/:userId/profile` | Full member profile: KYC fields + membership info (self or governance) — distinct from the card, which is deliberately minimal since it's meant to be shown/scanned |
+| `GET /cooperatives/:id/members/:userId/avatar` | A member's profile photo (self or governance) |
+| `GET\|PATCH /users/me/avatar` | View/upload the caller's own profile photo (base64, same convention as the cooperative logo) |
 | `GET /cooperatives/:id/members/:userId/card` | Digital membership card + QR code (self or governance) |
 | `POST\|GET /cooperatives/:id/members/:userId/guarantors` | Nominate/list guarantors (self or governance) |
 | `PATCH /cooperatives/:id/guarantors/:guarantorId/respond` | Only the nominated guarantor can approve/decline |

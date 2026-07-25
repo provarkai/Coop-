@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **Full member profile page + profile photo (out-of-sequence addition)** —
+  The member detail page now shows a real profile, not just the membership
+  card: KYC fields (DOB, gender, phone, address, BVN, NIN), membership info
+  (role, category, status, join date), and a financial summary (savings
+  accounts, active loans, Kesa contribution trust score) pulled from
+  existing endpoints. New `GET /cooperatives/:id/members/:userId/profile`
+  (self-or-governance) fills the gap `/users/me` didn't cover: viewing
+  *another* member's KYC data. Also added a real profile photo — `User`
+  gains `avatar`/`avatarMimeType` (same Bytes-plus-mimetype convention as
+  the cooperative logo); self-service upload via `PATCH /users/me/avatar`,
+  and a cooperative-scoped `GET /cooperatives/:id/members/:userId/avatar`
+  (self-or-governance) for viewing another member's photo. Upload controls
+  added to both the member's own `/profile` page and their entry on the
+  cooperative's member detail page.
 - **Real payments via Paystack (out-of-sequence addition)** — Sprint 6's
   simulated payment gateway is replaced with a real
   [Paystack](https://paystack.com) integration. Each cooperative connects its

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -59,6 +59,31 @@ export class UsersService {
     return this.prisma.user.update({ where: { id }, data: { role } });
   }
 
+  async updateAvatar(
+    id: string,
+    dto: { mimeType: string; contentBase64: string },
+  ) {
+    await this.prisma.user.update({
+      where: { id },
+      data: {
+        avatar: Buffer.from(dto.contentBase64, 'base64'),
+        avatarMimeType: dto.mimeType,
+      },
+      select: { id: true },
+    });
+  }
+
+  async getAvatar(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { avatar: true, avatarMimeType: true },
+    });
+    if (!user?.avatar || !user.avatarMimeType) {
+      throw new NotFoundException('No avatar uploaded for this user');
+    }
+    return { content: user.avatar, mimeType: user.avatarMimeType };
+  }
+
   toPublicProfile(user: {
     id: string;
     email: string;
@@ -71,6 +96,7 @@ export class UsersService {
     address: string | null;
     bvn: string | null;
     nin: string | null;
+    avatarMimeType: string | null;
     mfaEnabled: boolean;
     createdAt: Date;
   }) {
@@ -86,6 +112,7 @@ export class UsersService {
       address,
       bvn,
       nin,
+      avatarMimeType,
       mfaEnabled,
       createdAt,
     } = user;
@@ -101,6 +128,7 @@ export class UsersService {
       address,
       bvn,
       nin,
+      avatarMimeType,
       mfaEnabled,
       createdAt,
     };

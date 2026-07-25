@@ -559,6 +559,70 @@ export class CooperativesService {
     return rejected;
   }
 
+  // /users/me/avatar only covers a member's own photo; this is the
+  // self-or-governance equivalent for viewing another member's, scoped to
+  // cooperatives they actually share (mirrors getMemberProfile below).
+  async getMemberAvatar(
+    cooperativeId: string,
+    userId: string,
+    requester: AuthenticatedUser,
+  ) {
+    await this.assertSelfOrGovernance(cooperativeId, userId, requester);
+    const membership = await this.prisma.cooperativeMembership.findUnique({
+      where: { cooperativeId_userId: { cooperativeId, userId } },
+    });
+    if (!membership) {
+      throw new NotFoundException('Member not found');
+    }
+    return this.users.getAvatar(userId);
+  }
+
+  // The full member profile (KYC fields + membership info) -- distinct from
+  // the membership card, which is deliberately minimal since it's meant to
+  // be shown/scanned. /users/me only covers a member's own profile; this is
+  // the self-or-governance equivalent for viewing another member's.
+  async getMemberProfile(
+    cooperativeId: string,
+    userId: string,
+    requester: AuthenticatedUser,
+  ) {
+    await this.assertSelfOrGovernance(cooperativeId, userId, requester);
+
+    const membership = await this.prisma.cooperativeMembership.findUnique({
+      where: { cooperativeId_userId: { cooperativeId, userId } },
+      include: { user: true },
+    });
+    if (!membership) {
+      throw new NotFoundException('Member not found');
+    }
+
+    // mfaEnabled is account-security info relevant only to the member's own
+    // /profile page, not something another viewer (even governance) needs.
+    const publicProfile = this.users.toPublicProfile(membership.user);
+
+    return {
+      membershipNumber: membership.membershipNumber,
+      role: membership.role,
+      category: membership.category,
+      status: membership.status,
+      joinedAt: membership.joinedAt,
+      user: {
+        id: publicProfile.id,
+        email: publicProfile.email,
+        firstName: publicProfile.firstName,
+        lastName: publicProfile.lastName,
+        dateOfBirth: publicProfile.dateOfBirth,
+        gender: publicProfile.gender,
+        phone: publicProfile.phone,
+        address: publicProfile.address,
+        bvn: publicProfile.bvn,
+        nin: publicProfile.nin,
+        avatarMimeType: publicProfile.avatarMimeType,
+        createdAt: publicProfile.createdAt,
+      },
+    };
+  }
+
   async getMembershipCard(
     cooperativeId: string,
     userId: string,

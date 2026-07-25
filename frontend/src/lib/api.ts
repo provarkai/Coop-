@@ -85,6 +85,28 @@ export interface MembershipCard {
   qrCodeDataUrl: string;
 }
 
+export interface MemberProfile {
+  membershipNumber: string | null;
+  role: string;
+  category: string;
+  status: string;
+  joinedAt: string;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    dateOfBirth: string | null;
+    gender: string | null;
+    phone: string | null;
+    address: string | null;
+    bvn: string | null;
+    nin: string | null;
+    avatarMimeType: string | null;
+    createdAt: string;
+  };
+}
+
 export interface Guarantor {
   id: string;
   membershipId: string;
@@ -124,6 +146,7 @@ export interface UserProfile {
   address: string | null;
   bvn: string | null;
   nin: string | null;
+  avatarMimeType: string | null;
   mfaEnabled: boolean;
   createdAt: string;
 }
@@ -875,6 +898,9 @@ export const api = {
       true,
     ),
 
+  getMemberProfile: (cooperativeId: string, userId: string) =>
+    request<MemberProfile>(`/cooperatives/${cooperativeId}/members/${userId}/profile`, { method: "GET" }, true),
+
   getMembershipCard: (cooperativeId: string, userId: string) =>
     request<MembershipCard>(`/cooperatives/${cooperativeId}/members/${userId}/card`, { method: "GET" }, true),
 
@@ -933,6 +959,9 @@ export const api = {
       dateOfBirth?: string;
     },
   ) => request<UserProfile>("/users/me", { method: "PATCH", body: JSON.stringify(data) }, true),
+
+  updateMyAvatar: (data: { mimeType: string; contentBase64: string }) =>
+    request<{ updated: true }>("/users/me/avatar", { method: "PATCH", body: JSON.stringify(data) }, true),
 
   listUsers: () => request<PlatformUser[]>("/users", { method: "GET" }, true),
 
