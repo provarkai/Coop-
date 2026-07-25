@@ -1,6 +1,10 @@
+import { randomBytes } from 'node:crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Role } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
+
+const BCRYPT_ROUNDS = 12;
 
 @Injectable()
 export class UsersService {
@@ -22,6 +26,22 @@ export class UsersService {
     role?: Role;
   }) {
     return this.prisma.user.create({ data });
+  }
+
+  // Used by bulk member import: the cooperative is uploading people who
+  // don't have a platform account yet. The generated password is never
+  // returned or logged anywhere -- the member sets their own via the
+  // existing "Forgot password" flow before they ever log in.
+  async createWithRandomPassword(data: {
+    email: string;
+    firstName: string;
+    lastName: string;
+  }) {
+    const passwordHash = await bcrypt.hash(
+      randomBytes(32).toString('hex'),
+      BCRYPT_ROUNDS,
+    );
+    return this.create({ ...data, passwordHash });
   }
 
   updateProfile(

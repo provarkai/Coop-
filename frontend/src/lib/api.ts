@@ -69,6 +69,12 @@ export interface CooperativeMembership {
   user: { id: string; email: string; firstName: string; lastName: string };
 }
 
+export interface BulkImportResult {
+  imported: number;
+  skipped: number;
+  errors: { row: number; email: string; message: string }[];
+}
+
 export interface CooperativePreview {
   id: string;
   name: string;
@@ -861,6 +867,13 @@ export const api = {
     request<CooperativeMembership>(
       `/cooperatives/${cooperativeId}/members`,
       { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  bulkImportMembers: (cooperativeId: string, csvContent: string) =>
+    request<BulkImportResult>(
+      `/cooperatives/${cooperativeId}/members/bulk-import`,
+      { method: "POST", body: JSON.stringify({ csvContent }) },
       true,
     ),
 

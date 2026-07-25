@@ -25,6 +25,7 @@ import { UpdateBranchDto } from './dto/update-branch.dto';
 import { CreateCommitteeDto } from './dto/create-committee.dto';
 import { AddCommitteeMemberDto } from './dto/add-committee-member.dto';
 import { AddMemberDto } from './dto/add-member.dto';
+import { BulkImportMembersDto } from './dto/bulk-import-members.dto';
 import { UpdateMembershipDto } from './dto/update-membership.dto';
 import { ApplyDto } from './dto/apply.dto';
 import { AddGuarantorDto } from './dto/add-guarantor.dto';
@@ -169,6 +170,16 @@ export class CooperativesController {
     @Body() dto: AddMemberDto,
   ) {
     return this.cooperatives.addMember(id, actor, dto);
+  }
+
+  @CooperativeRoles(...MANAGE_GOVERNANCE)
+  @Post(':id/members/bulk-import')
+  bulkImportMembers(
+    @Param('id') id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: BulkImportMembersDto,
+  ) {
+    return this.cooperatives.bulkImportMembers(id, actor, dto);
   }
 
   @Get(':id/members')

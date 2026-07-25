@@ -13,6 +13,7 @@ import {
   Role,
 } from '@prisma/client';
 import * as QRCode from 'qrcode';
+import { fromCsv } from '../reports/csv.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
@@ -26,6 +27,7 @@ import { UpdateBranchDto } from './dto/update-branch.dto';
 import { CreateCommitteeDto } from './dto/create-committee.dto';
 import { AddCommitteeMemberDto } from './dto/add-committee-member.dto';
 import { AddMemberDto } from './dto/add-member.dto';
+import { BulkImportMembersDto } from './dto/bulk-import-members.dto';
 import { UpdateMembershipDto } from './dto/update-membership.dto';
 import { ApplyDto } from './dto/apply.dto';
 import { AddGuarantorDto } from './dto/add-guarantor.dto';
@@ -377,6 +379,89 @@ export class CooperativesService {
     });
 
     return withNumber;
+  }
+
+  // Bulk member onboarding from a CSV a cooperative uploads (digitizing an
+  // existing paper member list). Unlike addMember, a row whose email isn't
+  // already a registered user gets a brand-new account created for them --
+  // see UsersService.createWithRandomPassword. Partial success: a bad row
+  // is recorded as an error and processing continues with the rest, rather
+  // than failing the whole batch over one typo.
+  async bulkImportMembers(
+    cooperativeId: string,
+    actor: AuthenticatedUser,
+    dto: BulkImportMembersDto,
+  ) {
+    await this.getCooperativeOrThrow(cooperativeId);
+    const rows = fromCsv(dto.csvContent);
+
+    const errors: { row: number; email: string; message: string }[] = [];
+    let imported = 0;
+
+    for (const [index, row] of rows.entries()) {
+      const rowNumber = index + 2; // header is row 1
+      const email = row.email?.trim().toLowerCase() ?? '';
+      const firstName = row.firstName?.trim() ?? '';
+      const lastName = row.lastName?.trim() ?? '';
+
+      try {
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          throw new Error('Missing or invalid email');
+        }
+        if (!firstName || !lastName) {
+          throw new Error('Missing firstName or lastName');
+        }
+        const roleInput = row.role?.trim().toUpperCase() || Role.MEMBER;
+        if (!(Object.values(Role) as string[]).includes(roleInput)) {
+          throw new Error(`Unknown role "${row.role}"`);
+        }
+        const role = roleInput as Role;
+        const category = row.category?.trim() || 'ORDINARY';
+
+        let targetUser = await this.users.findByEmail(email);
+        if (!targetUser) {
+          targetUser = await this.users.createWithRandomPassword({
+            email,
+            firstName,
+            lastName,
+          });
+        }
+
+        const existingMembership =
+          await this.prisma.cooperativeMembership.findUnique({
+            where: {
+              cooperativeId_userId: { cooperativeId, userId: targetUser.id },
+            },
+          });
+        if (existingMembership) {
+          throw new Error('Already a member of this cooperative');
+        }
+
+        const membership = await this.prisma.cooperativeMembership.create({
+          data: { cooperativeId, userId: targetUser.id, role, category },
+        });
+        await this.assignMembershipNumber(cooperativeId, membership.id);
+
+        await this.auditLog.record({
+          cooperativeId,
+          actorUserId: actor.userId,
+          action: 'membership.bulk_imported',
+          targetType: 'CooperativeMembership',
+          targetId: membership.id,
+          metadata: { userId: targetUser.id, role, email },
+        });
+
+        imported++;
+      } catch (err) {
+        errors.push({
+          row: rowNumber,
+          email: email || '(missing)',
+          message: err instanceof Error ? err.message : 'Unknown error',
+        });
+      }
+    }
+
+    return { imported, skipped: errors.length, errors };
   }
 
   async listMembers(cooperativeId: string, user: AuthenticatedUser) {

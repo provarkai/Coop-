@@ -12,6 +12,7 @@ import {
   type AuthUser,
   type BankAccountStatus,
   type Branch,
+  type BulkImportResult,
   type Committee,
   type ComplianceFiling,
   type Cooperative,
@@ -99,6 +100,10 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
   const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState("MEMBER");
   const [memberError, setMemberError] = useState<string | null>(null);
+
+  const [bulkImportBusy, setBulkImportBusy] = useState(false);
+  const [bulkImportError, setBulkImportError] = useState<string | null>(null);
+  const [bulkImportResult, setBulkImportResult] = useState<BulkImportResult | null>(null);
 
   const [filings, setFilings] = useState<ComplianceFiling[]>([]);
   const [filingType, setFilingType] = useState("ANNUAL_RETURN");
@@ -344,6 +349,25 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
       setMembers(await api.listMembers(id));
     } catch (err) {
       setMemberError(err instanceof ApiError ? err.message : "Something went wrong");
+    }
+  }
+
+  async function onBulkImportFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setBulkImportBusy(true);
+    setBulkImportError(null);
+    setBulkImportResult(null);
+    try {
+      const csvContent = await file.text();
+      const result = await api.bulkImportMembers(id, csvContent);
+      setBulkImportResult(result);
+      setMembers(await api.listMembers(id));
+    } catch (err) {
+      setBulkImportError(err instanceof ApiError ? err.message : "Something went wrong");
+    } finally {
+      setBulkImportBusy(false);
     }
   }
 
@@ -1019,6 +1043,45 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
             Add
           </button>
         </form>
+      </section>
+
+      <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+        <h2 className="font-semibold text-black dark:text-zinc-50">Bulk import members</h2>
+        <p className="text-sm text-zinc-500 dark:text-zinc-500">
+          Upload a CSV with header row <code>firstName,lastName,email,role,category</code> (role and
+          category are optional). New accounts are created automatically for emails that aren&apos;t
+          already registered — those members set their password via &quot;Forgot password&quot; before
+          first login.
+        </p>
+        <ErrorText message={bulkImportError} />
+        <div className="flex items-center gap-3">
+          <label className="cursor-pointer rounded-full border border-black/[.08] px-4 py-1.5 text-sm font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]">
+            {bulkImportBusy ? "Importing…" : "Upload CSV"}
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={onBulkImportFile}
+              disabled={bulkImportBusy}
+              className="hidden"
+            />
+          </label>
+        </div>
+        {bulkImportResult && (
+          <div className="space-y-2 text-sm">
+            <p className="text-black dark:text-zinc-50">
+              Imported {bulkImportResult.imported}, skipped {bulkImportResult.skipped}.
+            </p>
+            {bulkImportResult.errors.length > 0 && (
+              <ul className="space-y-1 text-xs text-red-600 dark:text-red-400">
+                {bulkImportResult.errors.map((e, idx) => (
+                  <li key={idx}>
+                    Row {e.row} ({e.email || "no email"}): {e.message}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </section>
       </div>
 

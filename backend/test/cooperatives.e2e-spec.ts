@@ -17,6 +17,8 @@ describe('Cooperatives (e2e)', () => {
   const adminEmail = `coop-admin-${suffix}@example.com`;
   const memberEmail = `coop-member-${suffix}@example.com`;
   const outsiderEmail = `coop-outsider-${suffix}@example.com`;
+  const bulkExistingEmail = `coop-bulk-existing-${suffix}@example.com`;
+  const bulkNewEmail = `coop-bulk-new-${suffix}@example.com`;
   const password = 'correcthorsebattery';
   const slug = `test-coop-${suffix}`;
 
@@ -61,11 +63,23 @@ describe('Cooperatives (e2e)', () => {
 
     const outsider = await registerAndLogin(outsiderEmail);
     outsiderToken = outsider.accessToken;
+
+    await registerAndLogin(bulkExistingEmail);
   });
 
   afterAll(async () => {
     await prisma.user.deleteMany({
-      where: { email: { in: [adminEmail, memberEmail, outsiderEmail] } },
+      where: {
+        email: {
+          in: [
+            adminEmail,
+            memberEmail,
+            outsiderEmail,
+            bulkExistingEmail,
+            bulkNewEmail,
+          ],
+        },
+      },
     });
     await app.close();
   });
@@ -223,6 +237,61 @@ describe('Cooperatives (e2e)', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ email: memberEmail, role: 'MEMBER' })
       .expect(409);
+  });
+
+  it('bulk-imports members from CSV: creates new accounts, links existing users, and reports per-row errors', async () => {
+    const csvContent = [
+      'firstName,lastName,email,role,category',
+      `Brand,New,${bulkNewEmail},MEMBER,ORDINARY`,
+      `Already,Registered,${bulkExistingEmail},TREASURER,ORDINARY`,
+      `Already,AMember,${memberEmail},MEMBER,ORDINARY`,
+      'Missing,Email,,MEMBER,ORDINARY',
+    ].join('\n');
+
+    const res = await request(app.getHttpServer())
+      .post(`/cooperatives/${cooperativeId}/members/bulk-import`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ csvContent })
+      .expect(201);
+
+    expect(res.body.imported).toBe(2);
+    expect(res.body.skipped).toBe(2);
+    expect(res.body.errors).toHaveLength(2);
+    expect(
+      res.body.errors.find((e: { email: string }) => e.email === memberEmail)
+        .message,
+    ).toMatch(/already a member/i);
+    expect(
+      res.body.errors.find((e: { email: string }) => e.email === '(missing)')
+        .message,
+    ).toMatch(/invalid email/i);
+
+    const newUser = await prisma.user.findUnique({
+      where: { email: bulkNewEmail },
+    });
+    expect(newUser).not.toBeNull();
+    const newMembership = await prisma.cooperativeMembership.findUnique({
+      where: { cooperativeId_userId: { cooperativeId, userId: newUser!.id } },
+    });
+    expect(newMembership?.membershipNumber).toEqual(expect.any(String));
+
+    const existingUser = await prisma.user.findUnique({
+      where: { email: bulkExistingEmail },
+    });
+    const existingMembership = await prisma.cooperativeMembership.findUnique({
+      where: {
+        cooperativeId_userId: { cooperativeId, userId: existingUser!.id },
+      },
+    });
+    expect(existingMembership?.role).toBe('TREASURER');
+  });
+
+  it('rejects bulk import from a non-governance member', async () => {
+    await request(app.getHttpServer())
+      .post(`/cooperatives/${cooperativeId}/members/bulk-import`)
+      .set('Authorization', `Bearer ${outsiderToken}`)
+      .send({ csvContent: 'firstName,lastName,email\nA,B,x@example.com' })
+      .expect(403);
   });
 
   it('lets a newly added member read the cooperative, but not manage it', async () => {
