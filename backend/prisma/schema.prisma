@@ -162,6 +162,15 @@ model Cooperative {
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 
+  // Paystack subaccount: real payments settle straight to the cooperative's
+  // own bank account (a "split" destination), not into a platform-held
+  // balance -- set once the cooperative connects a bank account. A
+  // cooperative with no subaccountCode cannot accept payments yet.
+  paystackSubaccountCode          String?
+  paystackSubaccountBankCode      String?
+  paystackSubaccountAccountNumber String?
+  paystackSubaccountAccountName   String?
+
   branches             Branch[]
   committees           Committee[]
   memberships          CooperativeMembership[]
@@ -565,6 +574,7 @@ model Payment {
   loan             Loan?                 @relation(fields: [loanId], references: [id])
   amount           Decimal               @db.Decimal(14, 2)
   gatewayReference String                @unique
+  authorizationUrl String?
   status           PaymentStatus         @default(INITIATED)
   narration        String?
   completedAt      DateTime?

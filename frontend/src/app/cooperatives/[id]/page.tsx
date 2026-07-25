@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, use, type ChangeEvent, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   api,
@@ -10,11 +10,13 @@ import {
   getAccessToken,
   type AuditLogEntry,
   type AuthUser,
+  type BankAccountStatus,
   type Branch,
   type Committee,
   type ComplianceFiling,
   type Cooperative,
   type CooperativeMembership,
+  type PaystackBank,
   type SavingsAccount,
   type SavingsProduct,
   type SavingsReceipt,
@@ -53,8 +55,9 @@ function ErrorText({ message }: { message: string | null }) {
 export default function CooperativeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [activeSection, setActiveSection] = useState("dashboard");
+  const [activeSection, setActiveSection] = useState(() => searchParams.get("section") ?? "dashboard");
   const [me, setMe] = useState<AuthUser | null>(null);
   const [cooperative, setCooperative] = useState<Cooperative | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -78,6 +81,13 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
 
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
+
+  const [banks, setBanks] = useState<PaystackBank[]>([]);
+  const [bankAccountStatus, setBankAccountStatus] = useState<BankAccountStatus | null>(null);
+  const [bankCode, setBankCode] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankAccountError, setBankAccountError] = useState<string | null>(null);
+  const [bankAccountMessage, setBankAccountMessage] = useState<string | null>(null);
 
   const [branchName, setBranchName] = useState("");
   const [branchError, setBranchError] = useState<string | null>(null);
@@ -142,6 +152,17 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
     setFilings(await api.listComplianceFilingsForCooperative(id));
     setSavingsProducts(await api.listSavingsProducts(id));
 
+    // Real payments require PAYSTACK_SECRET_KEY to be configured; if it isn't
+    // (or Paystack is unreachable), the bank-account section just stays
+    // empty/unconnected rather than breaking the whole page.
+    try {
+      setBanks(await api.listBanks());
+      setBankAccountStatus(await api.getBankAccountStatus(id));
+    } catch {
+      setBanks([]);
+      setBankAccountStatus(null);
+    }
+
     // Audit logs are governance/auditor-only; a 403 here just means this
     // viewer isn't one, so the section stays hidden rather than erroring.
     try {
@@ -199,6 +220,20 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
       setMembers(await api.listMembers(id));
     } catch (err) {
       setPendingError(err instanceof ApiError ? err.message : "Something went wrong");
+    }
+  }
+
+  async function onConnectBankAccount(e: FormEvent) {
+    e.preventDefault();
+    setBankAccountError(null);
+    setBankAccountMessage(null);
+    try {
+      const status = await api.connectBankAccount(id, { bankCode, accountNumber: bankAccountNumber });
+      setBankAccountStatus(status);
+      setBankAccountMessage("Connected");
+      setBankAccountNumber("");
+    } catch (err) {
+      setBankAccountError(err instanceof ApiError ? err.message : "Something went wrong");
     }
   }
 
@@ -721,6 +756,49 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
             className="rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
           >
             Save
+          </button>
+        </form>
+      </section>
+
+      <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+        <h2 className="font-semibold text-black dark:text-zinc-50">Payments — bank account</h2>
+        <p className="text-xs text-zinc-500">
+          Connect this cooperative&apos;s bank account via Paystack so members can pay real savings deposits and loan
+          repayments straight into it. No cooperative-held funds — Paystack settles directly to this account.
+        </p>
+        <ErrorText message={bankAccountError} />
+        {bankAccountMessage && <p className="text-sm text-zinc-600 dark:text-zinc-400">{bankAccountMessage}</p>}
+        {bankAccountStatus?.connected && (
+          <p className="text-sm text-green-600 dark:text-green-400">
+            Connected: {bankAccountStatus.paystackSubaccountAccountName} ({bankAccountStatus.paystackSubaccountAccountNumber})
+          </p>
+        )}
+        <form onSubmit={onConnectBankAccount} className="flex flex-wrap gap-2">
+          <select
+            className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+            value={bankCode}
+            onChange={(e) => setBankCode(e.target.value)}
+            required
+          >
+            <option value="">Choose a bank…</option>
+            {banks.map((b) => (
+              <option key={b.slug} value={b.code}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+          <input
+            className="w-40 rounded-md border border-black/[.08] bg-transparent px-3 py-1.5 text-sm dark:border-white/[.145]"
+            placeholder="Account number"
+            value={bankAccountNumber}
+            onChange={(e) => setBankAccountNumber(e.target.value)}
+            required
+          />
+          <button
+            type="submit"
+            className="rounded-full border border-black/[.08] px-4 py-1.5 text-sm font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+          >
+            {bankAccountStatus?.connected ? "Reconnect" : "Connect"}
           </button>
         </form>
       </section>

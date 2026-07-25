@@ -3,8 +3,10 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   MembershipStatus,
   PaymentPurpose,
@@ -16,21 +18,79 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { SavingsService } from '../savings/savings.service';
 import { LoansService } from '../loans/loans.service';
+import { PaystackService } from './paystack.service';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
-import {
-  MANAGE_PAYMENT_ROLES,
-  VIEW_PAYMENT_ROLES,
-} from '../cooperatives/roles.constants';
+import { VIEW_PAYMENT_ROLES } from '../cooperatives/roles.constants';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
-import { SimulateCallbackDto } from './dto/simulate-callback.dto';
+import { ConnectBankAccountDto } from './dto/connect-bank-account.dto';
+
+const PAYMENT_INCLUDE = {
+  membership: { include: { user: true } },
+  savingsAccount: { include: { product: true } },
+  loan: { include: { product: true } },
+} as const;
+
+const BANK_ACCOUNT_SELECT = {
+  paystackSubaccountCode: true,
+  paystackSubaccountBankCode: true,
+  paystackSubaccountAccountNumber: true,
+  paystackSubaccountAccountName: true,
+} as const;
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly savings: SavingsService,
     private readonly loans: LoansService,
+    private readonly paystack: PaystackService,
+    private readonly config: ConfigService,
   ) {}
+
+  async listBanks() {
+    return this.paystack.listBanks();
+  }
+
+  async connectBankAccount(cooperativeId: string, dto: ConnectBankAccountDto) {
+    const cooperative = await this.prisma.cooperative.findUnique({
+      where: { id: cooperativeId },
+    });
+    if (!cooperative) {
+      throw new NotFoundException('Cooperative not found');
+    }
+    const resolved = await this.paystack.resolveAccountNumber(
+      dto.accountNumber,
+      dto.bankCode,
+    );
+    const subaccount = await this.paystack.createSubaccount({
+      businessName: cooperative.name,
+      bankCode: dto.bankCode,
+      accountNumber: dto.accountNumber,
+    });
+    return this.prisma.cooperative.update({
+      where: { id: cooperativeId },
+      data: {
+        paystackSubaccountCode: subaccount.subaccountCode,
+        paystackSubaccountBankCode: dto.bankCode,
+        paystackSubaccountAccountNumber: resolved.accountNumber,
+        paystackSubaccountAccountName: resolved.accountName,
+      },
+      select: BANK_ACCOUNT_SELECT,
+    });
+  }
+
+  async getBankAccountStatus(cooperativeId: string) {
+    const cooperative = await this.prisma.cooperative.findUnique({
+      where: { id: cooperativeId },
+      select: BANK_ACCOUNT_SELECT,
+    });
+    if (!cooperative) {
+      throw new NotFoundException('Cooperative not found');
+    }
+    return { ...cooperative, connected: !!cooperative.paystackSubaccountCode };
+  }
 
   async initiate(
     cooperativeId: string,
@@ -42,6 +102,15 @@ export class PaymentsService {
     });
     if (!membership || membership.status !== MembershipStatus.ACTIVE) {
       throw new BadRequestException('You are not an active cooperative member');
+    }
+
+    const cooperative = await this.prisma.cooperative.findUnique({
+      where: { id: cooperativeId },
+    });
+    if (!cooperative?.paystackSubaccountCode) {
+      throw new BadRequestException(
+        'This cooperative has not connected a bank account yet -- ask your cooperative admin to set one up in Settings before paying.',
+      );
     }
 
     let savingsAccountId: string | undefined;
@@ -79,7 +148,16 @@ export class PaymentsService {
       loanId = loan.id;
     }
 
-    const gatewayReference = `SIM-${randomBytes(6).toString('hex').toUpperCase()}`;
+    const gatewayReference = `NCMS-${randomBytes(6).toString('hex').toUpperCase()}`;
+    const frontendUrl =
+      this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
+    const initialized = await this.paystack.initializeTransaction({
+      email: payer.email,
+      amountNaira: dto.amount,
+      reference: gatewayReference,
+      subaccountCode: cooperative.paystackSubaccountCode,
+      callbackUrl: `${frontendUrl}/payments/callback?cooperativeId=${cooperativeId}`,
+    });
 
     return this.prisma.payment.create({
       data: {
@@ -92,34 +170,108 @@ export class PaymentsService {
         savingsAccountId,
         loanId,
         amount: dto.amount,
-        gatewayReference,
+        gatewayReference: initialized.reference,
+        authorizationUrl: initialized.authorizationUrl,
         narration: dto.narration,
       },
     });
   }
 
-  async simulateCallback(
+  /** Called by the frontend's /payments/callback return page as a belt-and-braces
+   * check in case the webhook hasn't landed yet -- forces a live Paystack verify. */
+  async verifyAndSync(
     cooperativeId: string,
     paymentId: string,
     requester: AuthenticatedUser,
-    dto: SimulateCallbackDto,
   ) {
     const payment = await this.getPaymentOrThrow(cooperativeId, paymentId);
+    return this.verifyPaymentRecord(payment, requester);
+  }
+
+  /** Same as verifyAndSync, but keyed by the Paystack reference -- the
+   * checkout-return page only has the reference Paystack appended to the
+   * callback URL, not our internal payment id. */
+  async verifyByReference(
+    cooperativeId: string,
+    reference: string,
+    requester: AuthenticatedUser,
+  ) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { gatewayReference: reference },
+      include: PAYMENT_INCLUDE,
+    });
+    if (!payment || payment.cooperativeId !== cooperativeId) {
+      throw new NotFoundException('Payment not found');
+    }
+    return this.verifyPaymentRecord(payment, requester);
+  }
+
+  private async verifyPaymentRecord(
+    payment: Awaited<ReturnType<PaymentsService['getPaymentOrThrow']>>,
+    requester: AuthenticatedUser,
+  ) {
     await this.assertSelfOrRole(
-      cooperativeId,
+      payment.cooperativeId,
       payment.membership.userId,
       requester,
-      MANAGE_PAYMENT_ROLES,
+      VIEW_PAYMENT_ROLES,
     );
     if (payment.status !== PaymentStatus.INITIATED) {
-      throw new BadRequestException('This payment has already been completed');
+      return payment;
     }
+    const verified = await this.paystack.verifyTransaction(
+      payment.gatewayReference,
+    );
+    if (verified.status === 'success') {
+      return this.applySuccess(payment);
+    }
+    if (verified.status === 'failed' || verified.status === 'abandoned') {
+      return this.applyFailed(payment);
+    }
+    return payment;
+  }
 
-    if (dto.outcome === 'FAILED') {
-      return this.prisma.payment.update({
-        where: { id: paymentId },
-        data: { status: PaymentStatus.FAILED, completedAt: new Date() },
-      });
+  async handleWebhookEvent(rawBody: Buffer, signature: string | undefined) {
+    if (!this.paystack.verifyWebhookSignature(rawBody, signature)) {
+      throw new ForbiddenException('Invalid webhook signature');
+    }
+    const event = JSON.parse(rawBody.toString('utf8')) as {
+      event?: string;
+      data?: { reference?: string };
+    };
+    const reference = event.data?.reference;
+    if (!reference) {
+      return { received: true };
+    }
+    const payment = await this.prisma.payment.findUnique({
+      where: { gatewayReference: reference },
+      include: PAYMENT_INCLUDE,
+    });
+    if (!payment) {
+      this.logger.warn(`Webhook for unknown payment reference ${reference}`);
+      return { received: true };
+    }
+    if (event.event === 'charge.success') {
+      await this.applySuccess(payment);
+    } else if (event.event === 'charge.failed') {
+      await this.applyFailed(payment);
+    }
+    return { received: true };
+  }
+
+  /** Atomically claims the payment (INITIATED -> SUCCESS) before crediting the
+   * ledger, so a retried webhook racing a manual verify can never double-credit.
+   * If crediting then fails, the claim is rolled back to INITIATED so a later
+   * retry can safely try again. */
+  private async applySuccess(
+    payment: Awaited<ReturnType<PaymentsService['getPaymentOrThrow']>>,
+  ) {
+    const claimed = await this.prisma.payment.updateMany({
+      where: { id: payment.id, status: PaymentStatus.INITIATED },
+      data: { status: PaymentStatus.SUCCESS, completedAt: new Date() },
+    });
+    if (claimed.count === 0) {
+      return this.getPaymentOrThrow(payment.cooperativeId, payment.id);
     }
 
     const payerActor: AuthenticatedUser = {
@@ -127,31 +279,44 @@ export class PaymentsService {
       email: payment.membership.user.email,
       role: payment.membership.user.role,
     };
-    const narration = `Gateway payment ${payment.gatewayReference}`;
-
-    if (payment.purpose === PaymentPurpose.SAVINGS_DEPOSIT) {
-      await this.savings.recordTransaction(
-        cooperativeId,
-        payment.savingsAccountId!,
-        payerActor,
-        { type: 'DEPOSIT', amount: Number(payment.amount), narration },
+    const narration = `Paystack payment ${payment.gatewayReference}`;
+    try {
+      if (payment.purpose === PaymentPurpose.SAVINGS_DEPOSIT) {
+        await this.savings.recordTransaction(
+          payment.cooperativeId,
+          payment.savingsAccountId!,
+          payerActor,
+          { type: 'DEPOSIT', amount: Number(payment.amount), narration },
+        );
+      } else {
+        await this.loans.recordRepayment(
+          payment.cooperativeId,
+          payment.loanId!,
+          payerActor,
+          { amount: Number(payment.amount), narration },
+        );
+      }
+    } catch (err) {
+      this.logger.error(
+        `Failed to credit ledger for payment ${payment.id} after Paystack success: ${err}`,
       );
-    } else {
-      await this.loans.recordRepayment(
-        cooperativeId,
-        payment.loanId!,
-        payerActor,
-        {
-          amount: Number(payment.amount),
-          narration,
-        },
-      );
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: PaymentStatus.INITIATED, completedAt: null },
+      });
+      throw err;
     }
+    return this.getPaymentOrThrow(payment.cooperativeId, payment.id);
+  }
 
-    return this.prisma.payment.update({
-      where: { id: paymentId },
-      data: { status: PaymentStatus.SUCCESS, completedAt: new Date() },
+  private async applyFailed(
+    payment: Awaited<ReturnType<PaymentsService['getPaymentOrThrow']>>,
+  ) {
+    await this.prisma.payment.updateMany({
+      where: { id: payment.id, status: PaymentStatus.INITIATED },
+      data: { status: PaymentStatus.FAILED, completedAt: new Date() },
     });
+    return this.getPaymentOrThrow(payment.cooperativeId, payment.id);
   }
 
   async listForCooperative(cooperativeId: string, status?: PaymentStatus) {
@@ -216,11 +381,7 @@ export class PaymentsService {
   private async getPaymentOrThrow(cooperativeId: string, paymentId: string) {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
-      include: {
-        membership: { include: { user: true } },
-        savingsAccount: { include: { product: true } },
-        loan: { include: { product: true } },
-      },
+      include: PAYMENT_INCLUDE,
     });
     if (!payment || payment.cooperativeId !== cooperativeId) {
       throw new NotFoundException('Payment not found');

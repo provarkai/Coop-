@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+- **Real payments via Paystack (out-of-sequence addition)** — Sprint 6's
+  simulated payment gateway is replaced with a real
+  [Paystack](https://paystack.com) integration. Each cooperative connects its
+  own bank account (`POST /cooperatives/:id/payments/bank-account`,
+  `COOPERATIVE_ADMIN`/`CHAIRMAN`/`TREASURER` only) — Paystack resolves the
+  account name and a Paystack **subaccount** is created for it
+  (`percentage_charge: 0`), so every payment settles straight to that
+  account. The platform never custodies member funds and takes no cut. A
+  cooperative with no connected bank account cannot accept payments.
+  Initiating a payment (`POST /cooperatives/:id/payments`) now returns a real
+  Paystack checkout `authorizationUrl`; settlement happens via a
+  HMAC-SHA512-signature-verified webhook (`POST /payments/webhook/paystack`,
+  public, no JWT) that credits the savings deposit or loan repayment on
+  `charge.success`. The payment row is atomically claimed
+  (`INITIATED` → `SUCCESS`/`FAILED`) before crediting the ledger, so a
+  retried webhook delivery racing a manual verify can never double-credit —
+  and if crediting then fails, the claim rolls back to `INITIATED` so a
+  later retry can safely try again. A `POST
+  /cooperatives/:id/payments/:paymentId/verify` (and a by-reference variant
+  for the checkout-return page, which only has the Paystack reference) force
+  a live verify for the case where the webhook hasn't landed yet. Frontend:
+  a Settings-tab "Connect a bank account" form (bank dropdown resolved live
+  against Paystack + account number), a real checkout redirect in place of
+  the old simulate-success/simulate-failure buttons, and a
+  `/payments/callback` return page.
 - **Kesa module suite (out-of-sequence addition)** — Three new modules built
   from the Provark "Kesa" product spec, added as cooperative features
   alongside the existing savings/loans engine, each with its own sidebar tab:

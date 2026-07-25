@@ -5,6 +5,7 @@ import {
   api,
   ApiError,
   type AuthUser,
+  type BankAccountStatus,
   type Loan,
   type Payment,
   type SavingsAccount,
@@ -34,6 +35,7 @@ export default function PaymentsSection({ cooperativeId, me }: { cooperativeId: 
   const [myPayments, setMyPayments] = useState<Payment[]>([]);
   const [allPayments, setAllPayments] = useState<Payment[] | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
+  const [bankStatus, setBankStatus] = useState<BankAccountStatus | null>(null);
 
   const [purpose, setPurpose] = useState<"SAVINGS_DEPOSIT" | "LOAN_REPAYMENT">("SAVINGS_DEPOSIT");
   const [targetId, setTargetId] = useState("");
@@ -52,6 +54,14 @@ export default function PaymentsSection({ cooperativeId, me }: { cooperativeId: 
     setMySavingsAccounts(accounts);
     setMyActiveLoans(loans.filter((l) => l.status === "ACTIVE"));
     setMyPayments(payments);
+    // Real payments require Paystack to be configured; if it isn't, treat
+    // the cooperative as not having connected a bank account yet rather
+    // than breaking the rest of this section.
+    try {
+      setBankStatus(await api.getBankAccountStatus(cooperativeId));
+    } catch {
+      setBankStatus(null);
+    }
     await reloadAllPayments();
   }
 
@@ -83,26 +93,24 @@ export default function PaymentsSection({ cooperativeId, me }: { cooperativeId: 
       return;
     }
     try {
-      await api.initiatePayment(cooperativeId, {
+      const payment = await api.initiatePayment(cooperativeId, {
         purpose,
         targetId,
         amount: Number(amount),
         narration: narration || undefined,
       });
-      setTargetId("");
-      setAmount("");
-      setNarration("");
-      if (me) setMyPayments(await api.listPaymentsForMember(cooperativeId, me.id));
-      await reloadAllPayments(statusFilter);
+      if (payment.authorizationUrl) {
+        window.location.href = payment.authorizationUrl;
+      }
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Something went wrong");
     }
   }
 
-  async function onSimulate(paymentId: string, outcome: "SUCCESS" | "FAILED") {
+  async function onCheckStatus(paymentId: string) {
     setActionError(null);
     try {
-      await api.simulatePaymentCallback(cooperativeId, paymentId, outcome);
+      await api.verifyPayment(cooperativeId, paymentId);
       if (me) setMyPayments(await api.listPaymentsForMember(cooperativeId, me.id));
       await reloadAllPayments(statusFilter);
     } catch (err) {
@@ -126,17 +134,19 @@ export default function PaymentsSection({ cooperativeId, me }: { cooperativeId: 
           <span className={`text-xs ${statusColor(p.status)}`}>{p.status}</span>
           {p.status === "INITIATED" && (
             <>
+              {p.authorizationUrl && (
+                <a
+                  href={p.authorizationUrl}
+                  className="rounded-full border border-black/[.08] px-2 py-0.5 text-xs font-medium dark:border-white/[.145]"
+                >
+                  Continue to checkout
+                </a>
+              )}
               <button
-                onClick={() => onSimulate(p.id, "SUCCESS")}
-                className="rounded-full border border-black/[.08] px-2 py-0.5 text-xs font-medium dark:border-white/[.145]"
+                onClick={() => onCheckStatus(p.id)}
+                className="text-xs text-zinc-600 hover:underline dark:text-zinc-400"
               >
-                Simulate success
-              </button>
-              <button
-                onClick={() => onSimulate(p.id, "FAILED")}
-                className="text-xs text-red-600 hover:underline dark:text-red-400"
-              >
-                Simulate failure
+                Check status
               </button>
             </>
           )}
@@ -150,6 +160,12 @@ export default function PaymentsSection({ cooperativeId, me }: { cooperativeId: 
       <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
         <h2 className="font-semibold text-black dark:text-zinc-50">Make a payment</h2>
         <ErrorText message={formError} />
+        {bankStatus && !bankStatus.connected && (
+          <p className="text-sm text-amber-600 dark:text-amber-400">
+            This cooperative hasn&apos;t connected a bank account yet — ask your cooperative admin to set one up in
+            Settings before paying.
+          </p>
+        )}
         <form onSubmit={onInitiate} className="flex flex-wrap gap-2">
           <select
             className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
@@ -195,7 +211,8 @@ export default function PaymentsSection({ cooperativeId, me }: { cooperativeId: 
           />
           <button
             type="submit"
-            className="rounded-full border border-black/[.08] px-4 py-1.5 text-sm font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+            disabled={!bankStatus?.connected}
+            className="rounded-full border border-black/[.08] px-4 py-1.5 text-sm font-medium text-black transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
           >
             Pay
           </button>

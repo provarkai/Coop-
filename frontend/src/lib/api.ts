@@ -285,6 +285,7 @@ export interface Payment {
   loanId: string | null;
   amount: string;
   gatewayReference: string;
+  authorizationUrl: string | null;
   status: "INITIATED" | "SUCCESS" | "FAILED";
   narration: string | null;
   completedAt: string | null;
@@ -292,6 +293,20 @@ export interface Payment {
   membership?: { user: { id: string; email: string; firstName: string; lastName: string } };
   savingsAccount?: { accountNumber: string; product?: { name: string } };
   loan?: { id: string; product?: { name: string } };
+}
+
+export interface PaystackBank {
+  name: string;
+  code: string;
+  slug: string;
+}
+
+export interface BankAccountStatus {
+  paystackSubaccountCode: string | null;
+  paystackSubaccountBankCode: string | null;
+  paystackSubaccountAccountNumber: string | null;
+  paystackSubaccountAccountName: string | null;
+  connected: boolean;
 }
 
 export type AccountType = "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
@@ -1170,10 +1185,25 @@ export const api = {
   listPaymentsForMember: (cooperativeId: string, userId: string) =>
     request<Payment[]>(`/cooperatives/${cooperativeId}/members/${userId}/payments`, { method: "GET" }, true),
 
-  simulatePaymentCallback: (cooperativeId: string, paymentId: string, outcome: "SUCCESS" | "FAILED") =>
+  verifyPayment: (cooperativeId: string, paymentId: string) =>
+    request<Payment>(`/cooperatives/${cooperativeId}/payments/${paymentId}/verify`, { method: "POST" }, true),
+
+  verifyPaymentByReference: (cooperativeId: string, reference: string) =>
     request<Payment>(
-      `/cooperatives/${cooperativeId}/payments/${paymentId}/simulate-callback`,
-      { method: "POST", body: JSON.stringify({ outcome }) },
+      `/cooperatives/${cooperativeId}/payments/by-reference/${reference}/verify`,
+      { method: "POST" },
+      true,
+    ),
+
+  listBanks: () => request<PaystackBank[]>("/cooperatives/payments/banks", { method: "GET" }, true),
+
+  getBankAccountStatus: (cooperativeId: string) =>
+    request<BankAccountStatus>(`/cooperatives/${cooperativeId}/payments/bank-account`, { method: "GET" }, true),
+
+  connectBankAccount: (cooperativeId: string, data: { bankCode: string; accountNumber: string }) =>
+    request<BankAccountStatus>(
+      `/cooperatives/${cooperativeId}/payments/bank-account`,
+      { method: "POST", body: JSON.stringify(data) },
       true,
     ),
 
