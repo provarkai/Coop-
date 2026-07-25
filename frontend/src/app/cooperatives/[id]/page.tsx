@@ -50,6 +50,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
   const { id } = use(params);
   const router = useRouter();
 
+  const [activeSection, setActiveSection] = useState("dashboard");
   const [me, setMe] = useState<AuthUser | null>(null);
   const [cooperative, setCooperative] = useState<Cooperative | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -537,7 +538,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
   return (
     <div className="w-full flex-1 bg-zinc-50 px-4 py-10 dark:bg-black">
       <div className="mx-auto flex w-full max-w-5xl flex-col items-start gap-6 sm:flex-row">
-        <Sidebar />
+        <Sidebar activeSection={activeSection} onSelect={setActiveSection} />
         <div className="w-full max-w-2xl flex-1 space-y-6">
       <div>
         <Link href="/cooperatives" className="text-sm font-medium text-black dark:text-zinc-50">
@@ -552,11 +553,12 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
         )}
       </div>
 
-      <div id="dashboard">
+      <div className={activeSection === "dashboard" ? "" : "hidden"}>
         <ReportsSection cooperativeId={id} />
       </div>
 
-      <section id="settings" className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+      <div className={activeSection === "settings" ? "space-y-6" : "hidden"}>
+      <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
         <h2 className="font-semibold text-black dark:text-zinc-50">Settings</h2>
         <form onSubmit={onSaveSettings} className="space-y-3">
           <ErrorText message={settingsError} />
@@ -687,7 +689,9 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
           </button>
         </form>
       </section>
+      </div>
 
+      <div className={activeSection === "members" ? "space-y-6" : "hidden"}>
       {members.some((m) => m.status === "PENDING") && (
         <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
           <h2 className="font-semibold text-black dark:text-zinc-50">Pending applications</h2>
@@ -721,7 +725,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
         </section>
       )}
 
-      <section id="members" className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+      <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
         <h2 className="font-semibold text-black dark:text-zinc-50">Members</h2>
         <ErrorText message={memberError} />
         <ul className="space-y-2">
@@ -808,7 +812,9 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
           </button>
         </form>
       </section>
+      </div>
 
+      <div className={activeSection === "savings" ? "space-y-6" : "hidden"}>
       <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
         <h2 className="font-semibold text-black dark:text-zinc-50">My savings</h2>
         <ul className="space-y-2">{mySavingsAccounts.map(renderMySavingsAccount)}</ul>
@@ -817,7 +823,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
         )}
       </section>
 
-      <section id="savings" className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+      <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
         <h2 className="font-semibold text-black dark:text-zinc-50">Savings products</h2>
         <ErrorText message={productError} />
         <ul className="space-y-1 text-sm">
@@ -882,32 +888,33 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
           )}
         </section>
       )}
+      </div>
 
-      <div id="loans">
+      <div className={activeSection === "loans" ? "" : "hidden"}>
         <LoansSection cooperativeId={id} me={me} />
       </div>
 
-      <div id="payments">
+      <div className={activeSection === "payments" ? "" : "hidden"}>
         <PaymentsSection cooperativeId={id} me={me} />
       </div>
 
-      <div id="accounting">
+      <div className={activeSection === "accounting" ? "" : "hidden"}>
         <AccountingSection cooperativeId={id} />
       </div>
 
-      <div id="meetings">
+      <div className={activeSection === "meetings" ? "" : "hidden"}>
         <MeetingsSection cooperativeId={id} me={me} />
       </div>
 
-      <div id="documents">
+      <div className={activeSection === "documents" ? "" : "hidden"}>
         <CommunicationSection cooperativeId={id} />
       </div>
 
-      <div id="ai">
+      <div className={activeSection === "ai" ? "" : "hidden"}>
         <AiAssistantSection cooperativeId={id} />
       </div>
 
-      <section id="compliance" className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+      <section className={`space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950 ${activeSection === "compliance" ? "" : "hidden"}`}>
         <h2 className="font-semibold text-black dark:text-zinc-50">Compliance filings</h2>
         <ErrorText message={filingError} />
         <ul className="space-y-1 text-sm">
@@ -971,7 +978,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
       </section>
 
       {auditLogs && (
-        <section id="audit" className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
+        <section className={`space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950 ${activeSection === "audit" ? "" : "hidden"}`}>
           <h2 className="font-semibold text-black dark:text-zinc-50">Audit log</h2>
           <ul className="space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
             {auditLogs.map((entry) => (

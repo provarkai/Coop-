@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Cooperative page: dashboard-first navigation** — The sidebar now switches
+  between sections (only the active one renders) instead of jumping to an
+  anchor on one long scrolling page. The Dashboard/report is the default
+  view; Settings, Members, Savings, Loans, Payments, Accounting, Meetings,
+  Documents & Comms, AI Assistant, Compliance, and Audit log each only render
+  once clicked.
 - **Regulator-scoped cooperative onboarding** — Cooperative creation is now
   `SUPER_ADMIN`-only: the platform team registers a cooperative on a
   regulator's request (per the Nigerian Co-operative Societies Act's

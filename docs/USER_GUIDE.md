@@ -15,7 +15,9 @@ it) that creates a ready-to-explore cooperative:
 Log in with that account, or register your own account and **join** it via an
 invite link shared by an existing admin. The rest of this guide assumes you're
 on a cooperative's detail page (`/cooperatives/:id`), which has a left sidebar
-jumping to every section described below.
+switching between every section described below. Only the Dashboard shows by
+default — everything else (Settings, Members, Savings, Loans, and so on) only
+renders once you click its sidebar entry.
 
 Cooperatives themselves aren't self-service: per the Nigerian Co-operative
 Societies Act, registering a new cooperative is done by the platform team
