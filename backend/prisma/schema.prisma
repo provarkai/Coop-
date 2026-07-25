@@ -840,9 +840,9 @@ model Notification {
   @@index([recipientUserId])
 }
 
-// Kesa module suite: digital contribution engine (Ajo/Esusu), land banking,
-// and property syndication, layered on top of the existing member/ledger
-// data. Kesa is a coordination layer, not a fund holder or legal verifier --
+// Digital contribution engine (Ajo/Esusu), land banking, and property
+// syndication, layered on top of the existing member/ledger data. This is a
+// coordination layer, not a fund holder or legal verifier --
 // escrow/trustee fund holding and land-registry checks are represented as
 // simulated/manually-entered data (escrowPartnerRef, verificationScore,
 // disputeCheckNotes), the same "simulated external partner" convention

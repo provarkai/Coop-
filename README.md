@@ -287,9 +287,9 @@ Requires `OPENROUTER_API_KEY` (see `backend/.env.example`) — an [OpenRouter](h
 | `GET /cooperatives/:id/loans/:loanId/risk-score` | Deterministic 0–100 risk score and LOW/MEDIUM/HIGH rating (loan-to-savings ratio, membership tenure, historical overdue installments, request-vs-product-max), plus an AI-authored plain-language explanation (any exco role) |
 | `GET /cooperatives/:id/fraud-alerts` | Deterministic scan of the last 30 days of savings transactions for unusually large transactions and rapid deposit-then-withdrawal round-trips (any exco role) |
 
-## Kesa Module Suite API
+## Contribution, Land Banking & Syndication Modules API
 
-Three modules from the "Kesa" product spec (Provark Global Services Ltd), each its own sidebar tab on the cooperative page. As with Payments, Kesa never touches real money or a real land registry: escrow funding just records an external trustee's reference/amount, and land verification/dispute notes are entered by a human, not fetched from a registry API. A new `LAND_DESK_OFFICER` cooperative role was added for the Land Banking desk; it's deliberately **not** part of `EXCO_ROLES` (unlike `LOAN_OFFICER`), so it doesn't get the blanket exco read access described above — it's scoped to its own function.
+Three modules — a digital contribution engine (Ajo/Esusu), land banking, and property syndication — each its own sidebar tab on the cooperative page. As with Payments, these never touch real money or a real land registry: escrow funding just records an external trustee's reference/amount, and land verification/dispute notes are entered by a human, not fetched from a registry API. A new `LAND_DESK_OFFICER` cooperative role was added for the Land Banking desk; it's deliberately **not** part of `EXCO_ROLES` (unlike `LOAN_OFFICER`), so it doesn't get the blanket exco read access described above — it's scoped to its own function.
 
 ### Contribution Engine (Ajo/Esusu)
 

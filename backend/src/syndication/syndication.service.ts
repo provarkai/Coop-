@@ -24,7 +24,7 @@ import { VerifyMilestoneDto } from './dto/verify-milestone.dto';
 import { RecordAllocationDto } from './dto/record-allocation.dto';
 
 // Default milestone schedule and release weighting for a new syndication.
-// Kesa never holds the escrowed funds itself -- fundEscrow just records
+// NCMS never holds the escrowed funds itself -- fundEscrow just records
 // that money moved to an external licensed trustee, and each milestone
 // release is a coordination/documentation step, not a real fund transfer.
 const DEFAULT_MILESTONES: { name: string; percent: number }[] = [

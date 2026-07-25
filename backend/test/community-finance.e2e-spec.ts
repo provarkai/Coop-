@@ -6,24 +6,24 @@ import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createCooperativeAsSuperAdmin } from './helpers/bootstrap-cooperative';
 
-// End-to-end walk through the full Kesa module suite (Ajo/Esusu contribution
+// End-to-end walk through the full contribution/land-banking/syndication suite (Ajo/Esusu contribution
 // engine -> land banking -> property syndication) in one flowing scenario,
 // since each module's real trigger condition is the previous module's
 // output (confirmed contributions build a trust score high enough to
 // reserve a parcel; reaching the parcel price confirms the reservation;
 // a confirmed reservation is what starts a syndication).
-describe('Kesa module suite (e2e)', () => {
+describe('Contribution, land banking & syndication modules (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
 
   const suffix = Date.now();
-  const adminEmail = `kesa-admin-${suffix}@example.com`;
-  const coordinatorEmail = `kesa-coordinator-${suffix}@example.com`;
-  const memberEmail = `kesa-member-${suffix}@example.com`;
-  const landOfficerEmail = `kesa-landofficer-${suffix}@example.com`;
-  const outsiderEmail = `kesa-outsider-${suffix}@example.com`;
+  const adminEmail = `cfm-admin-${suffix}@example.com`;
+  const coordinatorEmail = `cfm-coordinator-${suffix}@example.com`;
+  const memberEmail = `cfm-member-${suffix}@example.com`;
+  const landOfficerEmail = `cfm-landofficer-${suffix}@example.com`;
+  const outsiderEmail = `cfm-outsider-${suffix}@example.com`;
   const password = 'correcthorsebattery';
-  const slug = `kesa-coop-${suffix}`;
+  const slug = `cfm-coop-${suffix}`;
 
   let adminToken: string;
   let coordinatorToken: string;
@@ -66,7 +66,7 @@ describe('Kesa module suite (e2e)', () => {
 
     cooperativeId = (
       await createCooperativeAsSuperAdmin(app, prisma, {
-        name: 'Kesa Test Cooperative',
+        name: 'Community Finance Test Cooperative',
         slug,
         initialAdminEmail: adminEmail,
       })

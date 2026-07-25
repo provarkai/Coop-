@@ -68,7 +68,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
 
     // Savings/loans/trust-score have narrower role gates than the profile
     // itself (e.g. treasurer/loan-officer-only), and trust score only
-    // applies to members in a Kesa contribution group -- a 403/404 here
+    // applies to members in a contribution group -- a 403/404 here
     // just means that summary stays empty rather than breaking the page.
     try {
       setSavingsAccounts(await api.listSavingsAccountsForMember(id, userId));

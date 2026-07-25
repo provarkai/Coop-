@@ -6,7 +6,7 @@
   The member detail page now shows a real profile, not just the membership
   card: KYC fields (DOB, gender, phone, address, BVN, NIN), membership info
   (role, category, status, join date), and a financial summary (savings
-  accounts, active loans, Kesa contribution trust score) pulled from
+  accounts, active loans, contribution trust score) pulled from
   existing endpoints. New `GET /cooperatives/:id/members/:userId/profile`
   (self-or-governance) fills the gap `/users/me` didn't cover: viewing
   *another* member's KYC data. Also added a real profile photo — `User`
@@ -41,9 +41,9 @@
   against Paystack + account number), a real checkout redirect in place of
   the old simulate-success/simulate-failure buttons, and a
   `/payments/callback` return page.
-- **Kesa module suite (out-of-sequence addition)** — Three new modules built
-  from the Provark "Kesa" product spec, added as cooperative features
-  alongside the existing savings/loans engine, each with its own sidebar tab:
+- **Contribution, land banking & syndication modules (out-of-sequence addition)** —
+  Three new modules added as cooperative features alongside the existing
+  savings/loans engine, each with its own sidebar tab:
   - *Contribution Engine (Ajo/Esusu)* — `ContributionGroup`s (rotating or
     target-savings) with a coordinator, members, and per-period
     `Contribution`s that governance confirms, flags late, or flags
@@ -64,8 +64,8 @@
     directly — releasing the last milestone marks the syndication complete
     and the parcel sold.
 
-  As with the Payments module, Kesa **never touches real money or land
-  registries**: escrow funding just records an external trustee's reference
+  As with the Payments module, these modules **never touch real money or
+  land registries**: escrow funding just records an external trustee's reference
   and amount, and land verification/dispute notes are entered by a human,
   not fetched from a registry API — the same simulated-external-partner
   convention used throughout this codebase where a real integration doesn't

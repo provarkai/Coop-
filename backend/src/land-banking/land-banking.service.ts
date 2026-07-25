@@ -21,7 +21,7 @@ import { UpdateLandParcelDto } from './dto/update-land-parcel.dto';
 import { ReserveParcelDto } from './dto/reserve-parcel.dto';
 
 // A group's average trust score (see ContributionsService) must be at least
-// this to reserve a parcel -- the "STANDARD" band from the Kesa spec.
+// this to reserve a parcel -- the "STANDARD" rating band.
 const ELIGIBILITY_THRESHOLD = 40;
 const RESERVATION_HOLD_DAYS = 30;
 

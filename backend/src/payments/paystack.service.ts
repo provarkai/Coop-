@@ -120,7 +120,7 @@ export class PaystackService {
           settlement_bank: params.bankCode,
           account_number: params.accountNumber,
           // The cooperative keeps 100% of what it's paid; the platform takes
-          // no cut. Kesa/NCMS coordinates payments, it doesn't monetize them.
+          // no cut. NCMS coordinates payments, it doesn't monetize them.
           percentage_charge: 0,
         },
       },

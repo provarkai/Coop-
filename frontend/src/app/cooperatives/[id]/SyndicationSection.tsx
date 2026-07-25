@@ -121,7 +121,7 @@ export default function SyndicationSection({
     <section className="space-y-3 rounded-xl border border-black/[.08] bg-white p-6 dark:border-white/[.145] dark:bg-zinc-950">
       <h2 className="font-semibold text-black dark:text-zinc-50">Property syndication</h2>
       <p className="text-xs text-zinc-500">
-        Kesa coordinates and documents each purchase; it never holds the pooled funds itself -- escrow is a
+        NCMS coordinates and documents each purchase; it never holds the pooled funds itself -- escrow is a
         simulated record of an external licensed trustee, the same convention the Payments module uses.
       </p>
       <ErrorText message={actionError} />

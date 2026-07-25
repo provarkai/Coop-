@@ -588,10 +588,10 @@ async function request<T>(path: string, options: RequestInit = {}, auth = false)
   return body as T;
 }
 
-// Kesa module suite: digital contribution engine (Ajo/Esusu), land banking,
-// and property syndication. Escrow fund holding and land-registry checks are
+// Digital contribution engine (Ajo/Esusu), land banking, and property
+// syndication. Escrow fund holding and land-registry checks are
 // simulated/manually-entered (escrowPartnerRef, verificationScore) rather
-// than a real trustee/registry integration -- Kesa is a coordination layer,
+// than a real trustee/registry integration -- NCMS is a coordination layer,
 // not the fund holder, same convention as the Payments module.
 export type ContributionGroupType = "ROTATING" | "TARGET";
 export type ContributionFrequency = "DAILY" | "WEEKLY" | "MONTHLY";
@@ -1443,7 +1443,7 @@ export const api = {
   getFraudAlerts: (cooperativeId: string) =>
     request<FraudAlert[]>(`/cooperatives/${cooperativeId}/fraud-alerts`, { method: "GET" }, true),
 
-  // Kesa: Module 1 -- Contribution Engine (Ajo/Esusu)
+  // Module: Contribution Engine (Ajo/Esusu)
   createContributionGroup: (
     cooperativeId: string,
     data: {
@@ -1525,7 +1525,7 @@ export const api = {
   getMemberTrustScore: (cooperativeId: string, userId: string) =>
     request<TrustScore>(`/cooperatives/${cooperativeId}/members/${userId}/trust-score`, { method: "GET" }, true),
 
-  // Kesa: Module 2 -- Land Banking
+  // Module: Land Banking
   createLandParcel: (
     cooperativeId: string,
     data: {
@@ -1606,7 +1606,7 @@ export const api = {
       true,
     ),
 
-  // Kesa: Module 3 -- Property Syndication
+  // Module: Property Syndication
   initiateSyndication: (cooperativeId: string, reservationId: string) =>
     request<Syndication>(
       `/cooperatives/${cooperativeId}/reservations/${reservationId}/syndication`,
