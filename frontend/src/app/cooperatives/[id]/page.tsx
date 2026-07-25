@@ -28,6 +28,9 @@ import CommunicationSection from "./CommunicationSection";
 import ReportsSection from "./ReportsSection";
 import Sidebar from "./Sidebar";
 import AiAssistantSection from "./AiAssistantSection";
+import ContributionsSection from "./ContributionsSection";
+import LandBankingSection from "./LandBankingSection";
+import SyndicationSection from "./SyndicationSection";
 
 const FILING_TYPES = ["ANNUAL_RETURN", "FINANCIAL_STATEMENT", "AGM_MINUTES", "OTHER"];
 
@@ -1117,6 +1120,18 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
           </ul>
         </section>
       )}
+
+      <div className={activeSection === "contributions" ? "" : "hidden"}>
+        <ContributionsSection cooperativeId={id} />
+      </div>
+
+      <div className={activeSection === "land-banking" ? "" : "hidden"}>
+        <LandBankingSection cooperativeId={id} />
+      </div>
+
+      <div className={activeSection === "syndication" ? "" : "hidden"}>
+        <SyndicationSection cooperativeId={id} active={activeSection === "syndication"} />
+      </div>
         </div>
       </div>
     </div>

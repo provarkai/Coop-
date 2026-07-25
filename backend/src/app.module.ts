@@ -21,6 +21,9 @@ import { DocumentsModule } from './documents/documents.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReportsModule } from './reports/reports.module';
 import { AiModule } from './ai/ai.module';
+import { ContributionsModule } from './contributions/contributions.module';
+import { LandBankingModule } from './land-banking/land-banking.module';
+import { SyndicationModule } from './syndication/syndication.module';
 import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
 
 @Module({
@@ -46,6 +49,9 @@ import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
     NotificationsModule,
     ReportsModule,
     AiModule,
+    ContributionsModule,
+    LandBankingModule,
+    SyndicationModule,
   ],
   controllers: [AppController],
   providers: [

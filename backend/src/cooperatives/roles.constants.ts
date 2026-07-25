@@ -49,3 +49,19 @@ export const MANAGE_ACCOUNTING_ROLES = [
 ] as const;
 export const VIEW_ACCOUNTING_ROLES = EXCO_ROLES;
 export const VIEW_DASHBOARD_ROLES = EXCO_ROLES;
+
+// Kesa module suite (Ajo/Esusu contribution engine, land banking, property
+// syndication). LAND_DESK_OFFICER is a specific-function role (like
+// LOAN_OFFICER) and deliberately isn't part of EXCO_ROLES -- it doesn't get
+// blanket dashboard/savings/loans read access, only land-banking management.
+export const MANAGE_GROUP_ROLES = MANAGE_GOVERNANCE_ROLES;
+export const MANAGE_LAND_ROLES = [
+  Role.COOPERATIVE_ADMIN,
+  Role.CHAIRMAN,
+  Role.LAND_DESK_OFFICER,
+] as const;
+export const MANAGE_SYNDICATION_ROLES = [
+  Role.COOPERATIVE_ADMIN,
+  Role.CHAIRMAN,
+  Role.TREASURER,
+] as const;

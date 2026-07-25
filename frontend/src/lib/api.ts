@@ -550,6 +550,155 @@ async function request<T>(path: string, options: RequestInit = {}, auth = false)
   return body as T;
 }
 
+// Kesa module suite: digital contribution engine (Ajo/Esusu), land banking,
+// and property syndication. Escrow fund holding and land-registry checks are
+// simulated/manually-entered (escrowPartnerRef, verificationScore) rather
+// than a real trustee/registry integration -- Kesa is a coordination layer,
+// not the fund holder, same convention as the Payments module.
+export type ContributionGroupType = "ROTATING" | "TARGET";
+export type ContributionFrequency = "DAILY" | "WEEKLY" | "MONTHLY";
+export type ContributionGroupStatus = "ACTIVE" | "COMPLETED" | "CANCELLED";
+export type ContributionStatus = "PENDING" | "CONFIRMED" | "LATE" | "DEFAULTED";
+
+export interface ContributionGroup {
+  id: string;
+  cooperativeId: string;
+  name: string;
+  type: ContributionGroupType;
+  coordinatorMembershipId: string;
+  contributionAmount: string;
+  frequency: ContributionFrequency;
+  targetAmount: string | null;
+  status: ContributionGroupStatus;
+  createdAt: string;
+  updatedAt: string;
+  coordinatorMembership?: { user: { id: string; email: string; firstName: string; lastName: string } };
+  _count?: { members: number };
+  members?: ContributionGroupMember[];
+}
+
+export interface ContributionGroupMember {
+  id: string;
+  groupId: string;
+  membershipId: string;
+  rotationOrder: number | null;
+  status: "ACTIVE" | "EXITED";
+  joinedAt: string;
+  membership: { user: { id: string; email: string; firstName: string; lastName: string } };
+}
+
+export interface Contribution {
+  id: string;
+  groupId: string;
+  membershipId: string;
+  amount: string;
+  dueDate: string;
+  confirmedAt: string | null;
+  confirmedByUserId: string | null;
+  status: ContributionStatus;
+  createdAt: string;
+  membership?: { user: { id: string; email: string; firstName: string; lastName: string } };
+}
+
+export interface TrustScore {
+  score: number;
+  rating: "BELOW_THRESHOLD" | "STANDARD" | "HIGH";
+  totalPeriods: number;
+  confirmedCount: number;
+  lateCount: number;
+  defaultedCount: number;
+}
+
+export interface GroupTrustScore {
+  groupId: string;
+  memberCount: number;
+  averageScore: number;
+  rating: "BELOW_THRESHOLD" | "STANDARD" | "HIGH";
+}
+
+export type ParcelStatus = "UNDER_REVIEW" | "PUBLISHED" | "RESERVED" | "SOLD";
+
+export interface LandParcel {
+  id: string;
+  cooperativeId: string;
+  location: string;
+  coordinatesMinna: string | null;
+  coordinatesWgs84: string | null;
+  priceNaira: string;
+  sizeSqm: string | null;
+  titleStatus: string | null;
+  disputeCheckNotes: string | null;
+  verificationScore: number;
+  status: ParcelStatus;
+  listedByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ReservationStatus = "ACTIVE" | "EXPIRED" | "CONFIRMED" | "CANCELLED";
+
+export interface ParcelReservation {
+  id: string;
+  parcelId: string;
+  groupId: string;
+  holdExpiresAt: string;
+  status: ReservationStatus;
+  createdAt: string;
+  updatedAt: string;
+  group?: { id: string; name: string };
+  savedTotal?: number;
+  targetPrice?: string;
+  parcel?: LandParcel;
+}
+
+export type SyndicationStatus =
+  | "ESCROW_PENDING"
+  | "ESCROW_FUNDED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED";
+export type MilestoneStatus = "PENDING" | "VERIFIED" | "RELEASED";
+
+export interface SyndicationMilestone {
+  id: string;
+  syndicationId: string;
+  order: number;
+  name: string;
+  releaseAmount: string;
+  status: MilestoneStatus;
+  proofNotes: string | null;
+  verifiedByUserId: string | null;
+  verifiedAt: string | null;
+  releasedAt: string | null;
+}
+
+export interface Allocation {
+  id: string;
+  syndicationId: string;
+  membershipId: string;
+  plotRef: string;
+  documentIds: string[];
+  createdAt: string;
+  membership?: { user: { id: string; email: string; firstName: string; lastName: string } };
+}
+
+export interface Syndication {
+  id: string;
+  cooperativeId: string;
+  parcelId: string;
+  reservationId: string;
+  groupId: string;
+  escrowPartnerRef: string | null;
+  totalEscrowed: string;
+  status: SyndicationStatus;
+  createdAt: string;
+  updatedAt: string;
+  parcel?: LandParcel;
+  group?: { id: string; name: string };
+  milestones?: SyndicationMilestone[];
+  allocations?: Allocation[];
+}
+
 export const api = {
   register: (data: { email: string; password: string; firstName: string; lastName: string }) =>
     request<{ user: AuthUser } & TokenPair>("/auth/register", {
@@ -1234,6 +1383,224 @@ export const api = {
 
   getFraudAlerts: (cooperativeId: string) =>
     request<FraudAlert[]>(`/cooperatives/${cooperativeId}/fraud-alerts`, { method: "GET" }, true),
+
+  // Kesa: Module 1 -- Contribution Engine (Ajo/Esusu)
+  createContributionGroup: (
+    cooperativeId: string,
+    data: {
+      name: string;
+      type: ContributionGroupType;
+      coordinatorEmail: string;
+      contributionAmount: number;
+      frequency: ContributionFrequency;
+      targetAmount?: number;
+    },
+  ) =>
+    request<ContributionGroup>(
+      `/cooperatives/${cooperativeId}/contribution-groups`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  listContributionGroups: (cooperativeId: string) =>
+    request<ContributionGroup[]>(`/cooperatives/${cooperativeId}/contribution-groups`, { method: "GET" }, true),
+
+  getContributionGroup: (cooperativeId: string, groupId: string) =>
+    request<ContributionGroup>(
+      `/cooperatives/${cooperativeId}/contribution-groups/${groupId}`,
+      { method: "GET" },
+      true,
+    ),
+
+  addGroupMember: (cooperativeId: string, groupId: string, email: string) =>
+    request<ContributionGroupMember>(
+      `/cooperatives/${cooperativeId}/contribution-groups/${groupId}/members`,
+      { method: "POST", body: JSON.stringify({ email }) },
+      true,
+    ),
+
+  recordContributionPeriod: (
+    cooperativeId: string,
+    groupId: string,
+    data: { dueDate: string; amount?: number },
+  ) =>
+    request<Contribution[]>(
+      `/cooperatives/${cooperativeId}/contribution-groups/${groupId}/contributions`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  listContributions: (cooperativeId: string, groupId: string) =>
+    request<Contribution[]>(
+      `/cooperatives/${cooperativeId}/contribution-groups/${groupId}/contributions`,
+      { method: "GET" },
+      true,
+    ),
+
+  confirmContribution: (cooperativeId: string, groupId: string, contributionId: string) =>
+    request<Contribution>(
+      `/cooperatives/${cooperativeId}/contribution-groups/${groupId}/contributions/${contributionId}/confirm`,
+      { method: "PATCH" },
+      true,
+    ),
+
+  flagContribution: (
+    cooperativeId: string,
+    groupId: string,
+    contributionId: string,
+    status: "LATE" | "DEFAULTED",
+  ) =>
+    request<Contribution>(
+      `/cooperatives/${cooperativeId}/contribution-groups/${groupId}/contributions/${contributionId}/flag`,
+      { method: "PATCH", body: JSON.stringify({ status }) },
+      true,
+    ),
+
+  getGroupTrustScore: (cooperativeId: string, groupId: string) =>
+    request<GroupTrustScore>(
+      `/cooperatives/${cooperativeId}/contribution-groups/${groupId}/trust-score`,
+      { method: "GET" },
+      true,
+    ),
+
+  getMemberTrustScore: (cooperativeId: string, userId: string) =>
+    request<TrustScore>(`/cooperatives/${cooperativeId}/members/${userId}/trust-score`, { method: "GET" }, true),
+
+  // Kesa: Module 2 -- Land Banking
+  createLandParcel: (
+    cooperativeId: string,
+    data: {
+      location: string;
+      coordinatesMinna?: string;
+      coordinatesWgs84?: string;
+      priceNaira: number;
+      sizeSqm?: number;
+      titleStatus?: string;
+      disputeCheckNotes?: string;
+      verificationScore?: number;
+    },
+  ) =>
+    request<LandParcel>(
+      `/cooperatives/${cooperativeId}/land-parcels`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
+
+  listLandParcels: (cooperativeId: string) =>
+    request<LandParcel[]>(`/cooperatives/${cooperativeId}/land-parcels`, { method: "GET" }, true),
+
+  updateLandParcel: (
+    cooperativeId: string,
+    parcelId: string,
+    data: Partial<{
+      location: string;
+      coordinatesMinna: string;
+      coordinatesWgs84: string;
+      priceNaira: number;
+      sizeSqm: number;
+      titleStatus: string;
+      disputeCheckNotes: string;
+      verificationScore: number;
+    }>,
+  ) =>
+    request<LandParcel>(
+      `/cooperatives/${cooperativeId}/land-parcels/${parcelId}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      true,
+    ),
+
+  publishLandParcel: (cooperativeId: string, parcelId: string) =>
+    request<LandParcel>(
+      `/cooperatives/${cooperativeId}/land-parcels/${parcelId}/publish`,
+      { method: "POST" },
+      true,
+    ),
+
+  reserveParcel: (cooperativeId: string, parcelId: string, groupId: string) =>
+    request<ParcelReservation>(
+      `/cooperatives/${cooperativeId}/land-parcels/${parcelId}/reservations`,
+      { method: "POST", body: JSON.stringify({ groupId }) },
+      true,
+    ),
+
+  listReservationsForParcel: (cooperativeId: string, parcelId: string) =>
+    request<ParcelReservation[]>(
+      `/cooperatives/${cooperativeId}/land-parcels/${parcelId}/reservations`,
+      { method: "GET" },
+      true,
+    ),
+
+  getReservation: (cooperativeId: string, reservationId: string) =>
+    request<ParcelReservation>(`/cooperatives/${cooperativeId}/reservations/${reservationId}`, { method: "GET" }, true),
+
+  confirmReservation: (cooperativeId: string, reservationId: string) =>
+    request<ParcelReservation>(
+      `/cooperatives/${cooperativeId}/reservations/${reservationId}/confirm`,
+      { method: "PATCH" },
+      true,
+    ),
+
+  cancelReservation: (cooperativeId: string, reservationId: string) =>
+    request<ParcelReservation>(
+      `/cooperatives/${cooperativeId}/reservations/${reservationId}/cancel`,
+      { method: "PATCH" },
+      true,
+    ),
+
+  // Kesa: Module 3 -- Property Syndication
+  initiateSyndication: (cooperativeId: string, reservationId: string) =>
+    request<Syndication>(
+      `/cooperatives/${cooperativeId}/reservations/${reservationId}/syndication`,
+      { method: "POST" },
+      true,
+    ),
+
+  listSyndications: (cooperativeId: string) =>
+    request<Syndication[]>(`/cooperatives/${cooperativeId}/syndications`, { method: "GET" }, true),
+
+  getSyndication: (cooperativeId: string, syndicationId: string) =>
+    request<Syndication>(`/cooperatives/${cooperativeId}/syndications/${syndicationId}`, { method: "GET" }, true),
+
+  fundEscrow: (
+    cooperativeId: string,
+    syndicationId: string,
+    data: { escrowPartnerRef: string; amount: number },
+  ) =>
+    request<Syndication>(
+      `/cooperatives/${cooperativeId}/syndications/${syndicationId}/fund-escrow`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      true,
+    ),
+
+  verifyMilestone: (
+    cooperativeId: string,
+    syndicationId: string,
+    milestoneId: string,
+    proofNotes?: string,
+  ) =>
+    request<SyndicationMilestone>(
+      `/cooperatives/${cooperativeId}/syndications/${syndicationId}/milestones/${milestoneId}/verify`,
+      { method: "PATCH", body: JSON.stringify({ proofNotes }) },
+      true,
+    ),
+
+  releaseMilestone: (cooperativeId: string, syndicationId: string, milestoneId: string) =>
+    request<SyndicationMilestone>(
+      `/cooperatives/${cooperativeId}/syndications/${syndicationId}/milestones/${milestoneId}/release`,
+      { method: "PATCH" },
+      true,
+    ),
+
+  recordAllocation: (
+    cooperativeId: string,
+    syndicationId: string,
+    data: { memberEmail: string; plotRef: string; documentIds?: string[] },
+  ) =>
+    request<Allocation>(
+      `/cooperatives/${cooperativeId}/syndications/${syndicationId}/allocations`,
+      { method: "POST", body: JSON.stringify(data) },
+      true,
+    ),
 };
 
 // Skip the generic account hub whenever we can jump straight to somewhere

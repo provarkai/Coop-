@@ -60,6 +60,7 @@ enum Role {
   AUDITOR
   LOAN_OFFICER
   COMMITTEE_MEMBER
+  LAND_DESK_OFFICER
   MEMBER
 }
 
@@ -105,6 +106,9 @@ model User {
   notificationsSent           Notification[]          @relation("NotificationSender")
   regulatorAssignments        RegulatorAssignment[]   @relation("RegulatorAssignmentRegulator")
   regulatorAssignmentsMade    RegulatorAssignment[]   @relation("RegulatorAssignmentAssignedBy")
+  contributionsConfirmed      Contribution[]          @relation("ContributionConfirmer")
+  landParcelsListed           LandParcel[]            @relation("LandParcelLister")
+  milestonesVerified          SyndicationMilestone[]  @relation("MilestoneVerifier")
 }
 
 model RefreshToken {
@@ -175,6 +179,9 @@ model Cooperative {
   documents            Document[]
   notifications        Notification[]
   regulatorAssignments RegulatorAssignment[]
+  contributionGroups   ContributionGroup[]
+  landParcels          LandParcel[]
+  syndications         Syndication[]
 
   @@index([state])
 }
@@ -240,6 +247,11 @@ model CooperativeMembership {
   loans           Loan[]
   payments        Payment[]
   votes           Vote[]
+
+  groupsCoordinated ContributionGroup[]       @relation("GroupCoordinator")
+  groupMemberships  ContributionGroupMember[]
+  contributions     Contribution[]
+  allocations       Allocation[]
 
   @@unique([cooperativeId, userId])
   @@unique([cooperativeId, membershipNumber])
@@ -332,14 +344,14 @@ model ComplianceFiling {
 // Director of Cooperatives structure) -- SUPER_ADMIN bypasses this and sees
 // every cooperative regardless of assignment.
 model RegulatorAssignment {
-  id              String      @id @default(cuid())
-  cooperativeId   String
-  cooperative     Cooperative @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
-  regulatorUserId String
-  regulator       User        @relation("RegulatorAssignmentRegulator", fields: [regulatorUserId], references: [id], onDelete: Cascade)
+  id               String      @id @default(cuid())
+  cooperativeId    String
+  cooperative      Cooperative @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  regulatorUserId  String
+  regulator        User        @relation("RegulatorAssignmentRegulator", fields: [regulatorUserId], references: [id], onDelete: Cascade)
   assignedByUserId String
-  assignedBy      User        @relation("RegulatorAssignmentAssignedBy", fields: [assignedByUserId], references: [id])
-  createdAt       DateTime    @default(now())
+  assignedBy       User        @relation("RegulatorAssignmentAssignedBy", fields: [assignedByUserId], references: [id])
+  createdAt        DateTime    @default(now())
 
   @@unique([cooperativeId, regulatorUserId])
   @@index([regulatorUserId])
@@ -813,4 +825,221 @@ model Notification {
 
   @@index([cooperativeId])
   @@index([recipientUserId])
+}
+
+// Kesa module suite: digital contribution engine (Ajo/Esusu), land banking,
+// and property syndication, layered on top of the existing member/ledger
+// data. Kesa is a coordination layer, not a fund holder or legal verifier --
+// escrow/trustee fund holding and land-registry checks are represented as
+// simulated/manually-entered data (escrowPartnerRef, verificationScore,
+// disputeCheckNotes), the same "simulated external partner" convention
+// already used by the Payments module, rather than a real integration.
+
+enum ContributionGroupType {
+  ROTATING
+  TARGET
+}
+
+enum ContributionFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum ContributionGroupStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ContributionGroupMemberStatus {
+  ACTIVE
+  EXITED
+}
+
+enum ContributionStatus {
+  PENDING
+  CONFIRMED
+  LATE
+  DEFAULTED
+}
+
+model ContributionGroup {
+  id                      String                  @id @default(cuid())
+  cooperativeId           String
+  cooperative             Cooperative             @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  name                    String
+  type                    ContributionGroupType
+  coordinatorMembershipId String
+  coordinatorMembership   CooperativeMembership   @relation("GroupCoordinator", fields: [coordinatorMembershipId], references: [id])
+  contributionAmount      Decimal                 @db.Decimal(14, 2)
+  frequency               ContributionFrequency
+  targetAmount            Decimal?                @db.Decimal(14, 2)
+  status                  ContributionGroupStatus @default(ACTIVE)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  members       ContributionGroupMember[]
+  contributions Contribution[]
+  reservations  ParcelReservation[]
+  syndications  Syndication[]
+
+  @@unique([cooperativeId, name])
+  @@index([cooperativeId])
+}
+
+model ContributionGroupMember {
+  id            String                        @id @default(cuid())
+  groupId       String
+  group         ContributionGroup             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  membershipId  String
+  membership    CooperativeMembership         @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  rotationOrder Int?
+  status        ContributionGroupMemberStatus @default(ACTIVE)
+  joinedAt      DateTime                      @default(now())
+
+  @@unique([groupId, membershipId])
+  @@index([groupId])
+}
+
+model Contribution {
+  id                String                @id @default(cuid())
+  groupId           String
+  group             ContributionGroup     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  membershipId      String
+  membership        CooperativeMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  amount            Decimal               @db.Decimal(14, 2)
+  dueDate           DateTime
+  confirmedAt       DateTime?
+  confirmedByUserId String?
+  confirmedBy       User?                 @relation("ContributionConfirmer", fields: [confirmedByUserId], references: [id])
+  status            ContributionStatus    @default(PENDING)
+  createdAt         DateTime              @default(now())
+
+  @@index([groupId])
+  @@index([membershipId])
+}
+
+enum ParcelStatus {
+  UNDER_REVIEW
+  PUBLISHED
+  RESERVED
+  SOLD
+}
+
+model LandParcel {
+  id                String       @id @default(cuid())
+  cooperativeId     String
+  cooperative       Cooperative  @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  location          String
+  coordinatesMinna  String?
+  coordinatesWgs84  String?
+  priceNaira        Decimal      @db.Decimal(14, 2)
+  sizeSqm           Decimal?     @db.Decimal(10, 2)
+  titleStatus       String?
+  disputeCheckNotes String?
+  verificationScore Int          @default(0)
+  status            ParcelStatus @default(UNDER_REVIEW)
+  listedByUserId    String
+  listedBy          User         @relation("LandParcelLister", fields: [listedByUserId], references: [id])
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  reservations ParcelReservation[]
+  syndications Syndication[]
+
+  @@index([cooperativeId])
+}
+
+enum ReservationStatus {
+  ACTIVE
+  EXPIRED
+  CONFIRMED
+  CANCELLED
+}
+
+model ParcelReservation {
+  id            String            @id @default(cuid())
+  parcelId      String
+  parcel        LandParcel        @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  groupId       String
+  group         ContributionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  holdExpiresAt DateTime
+  status        ReservationStatus @default(ACTIVE)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  syndication Syndication?
+
+  @@unique([parcelId, groupId])
+  @@index([parcelId])
+  @@index([groupId])
+}
+
+enum SyndicationStatus {
+  ESCROW_PENDING
+  ESCROW_FUNDED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Syndication {
+  id               String            @id @default(cuid())
+  cooperativeId    String
+  cooperative      Cooperative       @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+  parcelId         String
+  parcel           LandParcel        @relation(fields: [parcelId], references: [id])
+  reservationId    String            @unique
+  reservation      ParcelReservation @relation(fields: [reservationId], references: [id])
+  groupId          String
+  group            ContributionGroup @relation(fields: [groupId], references: [id])
+  escrowPartnerRef String?
+  totalEscrowed    Decimal           @default(0) @db.Decimal(14, 2)
+  status           SyndicationStatus @default(ESCROW_PENDING)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  milestones  SyndicationMilestone[]
+  allocations Allocation[]
+
+  @@index([cooperativeId])
+}
+
+enum MilestoneStatus {
+  PENDING
+  VERIFIED
+  RELEASED
+}
+
+model SyndicationMilestone {
+  id               String          @id @default(cuid())
+  syndicationId    String
+  syndication      Syndication     @relation(fields: [syndicationId], references: [id], onDelete: Cascade)
+  order            Int
+  name             String
+  releaseAmount    Decimal         @db.Decimal(14, 2)
+  status           MilestoneStatus @default(PENDING)
+  proofNotes       String?
+  verifiedByUserId String?
+  verifiedBy       User?           @relation("MilestoneVerifier", fields: [verifiedByUserId], references: [id])
+  verifiedAt       DateTime?
+  releasedAt       DateTime?
+
+  @@unique([syndicationId, order])
+  @@index([syndicationId])
+}
+
+model Allocation {
+  id            String                @id @default(cuid())
+  syndicationId String
+  syndication   Syndication           @relation(fields: [syndicationId], references: [id], onDelete: Cascade)
+  membershipId  String
+  membership    CooperativeMembership @relation(fields: [membershipId], references: [id])
+  plotRef       String
+  documentIds   String[]
+  createdAt     DateTime              @default(now())
+
+  @@unique([syndicationId, membershipId])
+  @@index([syndicationId])
 }

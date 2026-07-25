@@ -279,6 +279,53 @@ Requires `OPENROUTER_API_KEY` (see `backend/.env.example`) — an [OpenRouter](h
 | `GET /cooperatives/:id/loans/:loanId/risk-score` | Deterministic 0–100 risk score and LOW/MEDIUM/HIGH rating (loan-to-savings ratio, membership tenure, historical overdue installments, request-vs-product-max), plus an AI-authored plain-language explanation (any exco role) |
 | `GET /cooperatives/:id/fraud-alerts` | Deterministic scan of the last 30 days of savings transactions for unusually large transactions and rapid deposit-then-withdrawal round-trips (any exco role) |
 
+## Kesa Module Suite API
+
+Three modules from the "Kesa" product spec (Provark Global Services Ltd), each its own sidebar tab on the cooperative page. As with Payments, Kesa never touches real money or a real land registry: escrow funding just records an external trustee's reference/amount, and land verification/dispute notes are entered by a human, not fetched from a registry API. A new `LAND_DESK_OFFICER` cooperative role was added for the Land Banking desk; it's deliberately **not** part of `EXCO_ROLES` (unlike `LOAN_OFFICER`), so it doesn't get the blanket exco read access described above — it's scoped to its own function.
+
+### Contribution Engine (Ajo/Esusu)
+
+Managing groups/members/periods is restricted to `COOPERATIVE_ADMIN`/`CHAIRMAN`/`SECRETARY`/`TREASURER` (`MANAGE_GROUP_ROLES`); any active member can read groups, contributions, and trust scores they're party to.
+
+| Endpoint | Description |
+| --- | --- |
+| `POST\|GET /cooperatives/:id/contribution-groups` | Create/list `ROTATING`/`TARGET` groups (name, coordinator, per-period amount, frequency, optional target amount) |
+| `GET /cooperatives/:id/contribution-groups/:groupId` | Group detail with members |
+| `POST /cooperatives/:id/contribution-groups/:groupId/members` | Add a member by email (coordinator or governance) |
+| `POST /cooperatives/:id/contribution-groups/:groupId/contributions` | Record a new due period, creating one `Contribution` per active group member |
+| `GET /cooperatives/:id/contribution-groups/:groupId/contributions` | List contributions for the group |
+| `POST /cooperatives/:id/contribution-groups/:groupId/contributions/:contributionId/confirm` | Mark a contribution `CONFIRMED` |
+| `POST /cooperatives/:id/contribution-groups/:groupId/contributions/:contributionId/flag` | Mark `LATE` or `DEFAULTED` |
+| `GET /cooperatives/:id/contribution-groups/:groupId/trust-score` | Group-average trust score + rating |
+| `GET /cooperatives/:id/members/:userId/trust-score` | One member's deterministic (non-AI) trust score — reliability rate + tenure bonus − late/default penalties, banded into HIGH/STANDARD/BELOW_THRESHOLD |
+
+### Land Banking
+
+Listing/publishing/reserving is restricted to `COOPERATIVE_ADMIN`/`CHAIRMAN`/`LAND_DESK_OFFICER` (`MANAGE_LAND_ROLES`); reading parcels/reservations is open to any active member.
+
+| Endpoint | Description |
+| --- | --- |
+| `POST\|GET /cooperatives/:id/land-parcels` | List a parcel (location, price, size, Minna/WGS84 coordinates, title status) as `UNDER_REVIEW`, or list all parcels |
+| `PATCH /cooperatives/:id/land-parcels/:parcelId` | Update details, including a manually-entered `verificationScore` (0–100) and dispute-check notes |
+| `POST /cooperatives/:id/land-parcels/:parcelId/publish` | Publish a parcel (moves `UNDER_REVIEW` → `PUBLISHED`) |
+| `POST\|GET /cooperatives/:id/land-parcels/:parcelId/reservations` | Reserve a published parcel for a group (requires the group's trust score to clear the eligibility threshold; 30-day hold) / list its reservations |
+| `GET /cooperatives/:id/reservations/:reservationId` | Reservation detail, including the group's saved total vs. the parcel price |
+| `POST /cooperatives/:id/reservations/:reservationId/confirm` | Confirm once the group's confirmed contributions cover the full parcel price |
+| `POST /cooperatives/:id/reservations/:reservationId/cancel` | Cancel an active reservation, freeing the parcel |
+
+### Property Syndication
+
+Managing escrow/milestones/allocations is restricted to `COOPERATIVE_ADMIN`/`CHAIRMAN`/`TREASURER` (`MANAGE_SYNDICATION_ROLES`); reading is open to any active member.
+
+| Endpoint | Description |
+| --- | --- |
+| `POST /cooperatives/:id/reservations/:reservationId/syndication` | Start a syndication from a confirmed reservation; auto-creates 3 milestones (Title Transfer 50%, Survey & Subdivision 30%, Final Allocation 20%) |
+| `GET /cooperatives/:id/syndications` \| `/:syndicationId` | List/detail, including milestones and allocations |
+| `PATCH /cooperatives/:id/syndications/:syndicationId/fund-escrow` | Record that funds moved to an external trustee (reference + amount) |
+| `PATCH /cooperatives/:id/syndications/:syndicationId/milestones/:milestoneId/verify` | Mark a milestone verified with proof notes |
+| `PATCH /cooperatives/:id/syndications/:syndicationId/milestones/:milestoneId/release` | Release a verified milestone's funds; releasing the last milestone completes the syndication and marks the parcel `SOLD` |
+| `POST /cooperatives/:id/syndications/:syndicationId/allocations` | Record a member's plot allocation once the syndication is `COMPLETED` |
+
 ## CI
 
 GitHub Actions (`.github/workflows/ci.yml`) lints, builds, and tests both `backend` and `frontend` on every push and pull request to `main`. The backend job runs against a real Postgres service container so the auth e2e suite exercises the full stack.

@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+- **Kesa module suite (out-of-sequence addition)** — Three new modules built
+  from the Provark "Kesa" product spec, added as cooperative features
+  alongside the existing savings/loans engine, each with its own sidebar tab:
+  - *Contribution Engine (Ajo/Esusu)* — `ContributionGroup`s (rotating or
+    target-savings) with a coordinator, members, and per-period
+    `Contribution`s that governance confirms, flags late, or flags
+    defaulted. A deterministic (non-AI) trust score per member and per group
+    — reliability rate, tenure bonus, late/default penalties — bands into
+    HIGH/STANDARD/BELOW_THRESHOLD, mirroring the existing loan-risk-score
+    pattern of being rule-based and exactly testable.
+  - *Land Banking* — Cooperatives list `LandParcel`s (location, price,
+    Minna/WGS84 coordinates, title status); a `LAND_DESK_OFFICER` role (or
+    `COOPERATIVE_ADMIN`/`CHAIRMAN`) records a manually-entered verification
+    score and publishes it. A group whose trust score clears the eligibility
+    threshold can reserve a published parcel for 30 days; the reservation
+    confirms once the group's confirmed contributions cover the full price.
+  - *Property Syndication* — Initiating a syndication from a confirmed
+    reservation auto-creates 3 milestones (Title Transfer 50%, Survey &
+    Subdivision 30%, Final Allocation 20%). Escrow funding, milestone
+    verification/release, and per-member plot allocation are all recorded
+    directly — releasing the last milestone marks the syndication complete
+    and the parcel sold.
+
+  As with the Payments module, Kesa **never touches real money or land
+  registries**: escrow funding just records an external trustee's reference
+  and amount, and land verification/dispute notes are entered by a human,
+  not fetched from a registry API — the same simulated-external-partner
+  convention used throughout this codebase where a real integration doesn't
+  exist. New Prisma models: `ContributionGroup`, `ContributionGroupMember`,
+  `Contribution`, `LandParcel`, `ParcelReservation`, `Syndication`,
+  `SyndicationMilestone`, `Allocation`. Frontend: three new sections
+  (Contribution Groups, Land Banking, Syndication) under the cooperative
+  page's sidebar.
 - **Cooperative profile, logo, and post-login redirect** — `Cooperative` gets
   a logo (`PATCH/GET /cooperatives/:id/logo`, base64 upload like documents,
   excluded from every general cooperative read so listings stay light) and a

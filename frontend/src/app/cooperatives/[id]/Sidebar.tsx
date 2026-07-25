@@ -15,6 +15,9 @@ export const NAV_ITEMS: { id: string; label: string }[] = [
   { id: "ai", label: "AI Assistant" },
   { id: "compliance", label: "Compliance" },
   { id: "audit", label: "Audit log" },
+  { id: "contributions", label: "Contribution Groups" },
+  { id: "land-banking", label: "Land Banking" },
+  { id: "syndication", label: "Syndication" },
 ];
 
 export default function Sidebar({
