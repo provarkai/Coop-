@@ -330,4 +330,44 @@ describe('AI Features (e2e)', () => {
       .set('Authorization', `Bearer ${memberToken}`)
       .expect(403);
   });
+
+  it('lets governance generate a custom AI report as a downloadable PDF document', async () => {
+    chatMock.mockClear();
+    const res = await request(app.getHttpServer())
+      .post(`/cooperatives/${cooperativeId}/ai/custom-report`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ prompt: 'Give me a delinquency and growth report' })
+      .expect(201);
+
+    // The mocked AI client returns plain text (not JSON), so generateCustomReport
+    // should fall back to wrapping it as a single section rather than crashing.
+    expect(res.body.title).toBe('Give me a delinquency and growth report');
+    expect(res.body.sections).toEqual([
+      { heading: 'Report', body: MOCK_ANSWER },
+    ]);
+    expect(res.body.document.mimeType).toBe('application/pdf');
+    expect(res.body.document.category).toBe('REPORT');
+    expect(res.body.document.sizeBytes).toBeGreaterThan(0);
+
+    const systemPrompt = chatMock.mock.calls[0][0][0].content as string;
+    expect(systemPrompt).toContain('STRICT JSON only');
+    expect(systemPrompt).toContain('Monthly trend (last 6 months)');
+    expect(systemPrompt).toContain('Top savers');
+
+    const documents = await request(app.getHttpServer())
+      .get(`/cooperatives/${cooperativeId}/documents`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(
+      documents.body.some((d: { id: string }) => d.id === res.body.document.id),
+    ).toBe(true);
+  });
+
+  it('denies a plain member from generating a custom AI report', async () => {
+    await request(app.getHttpServer())
+      .post(`/cooperatives/${cooperativeId}/ai/custom-report`)
+      .set('Authorization', `Bearer ${memberToken}`)
+      .send({ prompt: 'Give me a report' })
+      .expect(403);
+  });
 });

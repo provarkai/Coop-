@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type CustomReportResult } from "@/lib/api";
 
 function ErrorText({ message }: { message: string | null }) {
   if (!message) return null;
@@ -14,6 +14,11 @@ export default function AiAssistantSection({ cooperativeId }: { cooperativeId: s
   const [error, setError] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
 
+  const [reportPrompt, setReportPrompt] = useState("");
+  const [reportResult, setReportResult] = useState<CustomReportResult | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [generatingReport, setGeneratingReport] = useState(false);
+
   async function onAsk(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -25,6 +30,20 @@ export default function AiAssistantSection({ cooperativeId }: { cooperativeId: s
       setError(err instanceof ApiError ? err.message : "Something went wrong");
     } finally {
       setAsking(false);
+    }
+  }
+
+  async function onGenerateReport(e: FormEvent) {
+    e.preventDefault();
+    setReportError(null);
+    setReportResult(null);
+    setGeneratingReport(true);
+    try {
+      setReportResult(await api.generateCustomReport(cooperativeId, reportPrompt));
+    } catch (err) {
+      setReportError(err instanceof ApiError ? err.message : "Something went wrong");
+    } finally {
+      setGeneratingReport(false);
     }
   }
 
@@ -56,6 +75,52 @@ export default function AiAssistantSection({ cooperativeId }: { cooperativeId: s
           {asking ? "Asking…" : "Ask"}
         </button>
       </form>
+
+      <div className="space-y-3 border-t border-black/[.06] pt-4 dark:border-white/[.1]">
+        <h3 className="font-semibold text-black dark:text-zinc-50">Custom report</h3>
+        <p className="text-xs text-zinc-500">
+          Describe the report you want (e.g. &quot;loan delinquency and growth report for this
+          quarter&quot;) and get back an AI-authored PDF built from this cooperative&apos;s real
+          data. Governance roles only. The PDF is saved under Documents.
+        </p>
+        <ErrorText message={reportError} />
+        {reportResult && (
+          <div className="space-y-3 rounded-md border border-black/[.06] p-3 dark:border-white/[.1]">
+            <p className="text-sm font-medium text-black dark:text-zinc-50">
+              {reportResult.title}
+            </p>
+            {reportResult.sections.map((s, idx) => (
+              <div key={idx} className="space-y-1">
+                <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                  {s.heading}
+                </p>
+                <p className="whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">
+                  {s.body}
+                </p>
+              </div>
+            ))}
+            <p className="text-xs text-zinc-500">
+              Saved as &quot;{reportResult.document.fileName}&quot; under Documents.
+            </p>
+          </div>
+        )}
+        <form onSubmit={onGenerateReport} className="flex flex-wrap gap-2">
+          <input
+            className="flex-1 rounded-md border border-black/[.08] bg-transparent px-3 py-1.5 text-sm dark:border-white/[.145]"
+            placeholder="e.g. Member growth and savings trend report"
+            value={reportPrompt}
+            onChange={(e) => setReportPrompt(e.target.value)}
+            required
+          />
+          <button
+            type="submit"
+            disabled={generatingReport}
+            className="rounded-full border border-black/[.08] px-4 py-1.5 text-sm font-medium text-black transition-colors hover:bg-black/[.04] disabled:opacity-50 dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+          >
+            {generatingReport ? "Generating…" : "Generate report"}
+          </button>
+        </form>
+      </div>
     </section>
   );
 }

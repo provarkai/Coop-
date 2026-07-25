@@ -4,12 +4,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  DocumentCategory,
   LoanLedgerEntryType,
   LoanStatus,
   MeetingStatus,
   MembershipStatus,
   PaymentStatus,
   Prisma,
+  RepaymentInstallmentStatus,
   ResolutionStatus,
   Role,
   SavingsAccountStatus,
@@ -19,10 +21,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { AccountingService } from '../accounting/accounting.service';
 import { RegulatorAssignmentsService } from '../regulator-assignments/regulator-assignments.service';
+import { PdfService } from '../pdf/pdf.service';
 import { VIEW_DASHBOARD_ROLES } from '../cooperatives/roles.constants';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AiClientService } from './ai-client.service';
 import { AskAssistantDto } from './dto/ask-assistant.dto';
+import { GenerateCustomReportDto } from './dto/generate-custom-report.dto';
 
 interface DashboardSummaryLike {
   activeMembers: number;
@@ -46,6 +50,7 @@ export class AiService {
     private readonly aiClient: AiClientService,
     private readonly accounting: AccountingService,
     private readonly regulatorAssignments: RegulatorAssignmentsService,
+    private readonly pdf: PdfService,
   ) {}
 
   /**
@@ -131,6 +136,203 @@ export class AiService {
       `Cash balance: ${cashBalance.toFixed(2)}`,
       `Income statement: total income ${incomeStatement.totalIncome.toFixed(2)}, total expense ${incomeStatement.totalExpense.toFixed(2)}, net surplus ${incomeStatement.netSurplus.toFixed(2)}`,
     ];
+  }
+
+  /**
+   * Additional grounding data for custom reports, on top of buildGovernanceContext's
+   * point-in-time numbers: a 6-month trend series, overdue loan installments, and top
+   * savers -- the kind of detail an arbitrary report prompt ("delinquency", "growth",
+   * "top contributors") is likely to need. Queried directly (not via ReportsService) for
+   * the same circular-module reason documented on buildGovernanceContext.
+   */
+  private async buildTrendAndRiskContext(
+    cooperativeId: string,
+  ): Promise<string[]> {
+    const now = new Date();
+    const months: string[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const start = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1),
+      );
+      const end = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i + 1, 1),
+      );
+      const label = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, '0')}`;
+      const [newMembers, disbursed, repaid] = await Promise.all([
+        this.prisma.cooperativeMembership.count({
+          where: { cooperativeId, joinedAt: { gte: start, lt: end } },
+        }),
+        this.prisma.loanLedgerEntry.aggregate({
+          where: {
+            type: LoanLedgerEntryType.DISBURSEMENT,
+            createdAt: { gte: start, lt: end },
+            loan: { cooperativeId },
+          },
+          _sum: { amount: true },
+        }),
+        this.prisma.loanLedgerEntry.aggregate({
+          where: {
+            type: LoanLedgerEntryType.REPAYMENT,
+            createdAt: { gte: start, lt: end },
+            loan: { cooperativeId },
+          },
+          _sum: { amount: true },
+        }),
+      ]);
+      months.push(
+        `${label}: ${newMembers} new member(s), loans disbursed ${(disbursed._sum.amount ?? new Prisma.Decimal(0)).toFixed(2)}, loans repaid ${(repaid._sum.amount ?? new Prisma.Decimal(0)).toFixed(2)}`,
+      );
+    }
+
+    const overdueInstallments = await this.prisma.repaymentInstallment.findMany(
+      {
+        where: {
+          status: RepaymentInstallmentStatus.OVERDUE,
+          loan: { cooperativeId },
+        },
+        include: {
+          loan: {
+            include: {
+              membership: {
+                include: {
+                  user: { select: { firstName: true, lastName: true } },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { dueDate: 'asc' },
+        take: 10,
+      },
+    );
+
+    const topSavers = await this.prisma.savingsAccount.findMany({
+      where: { cooperativeId, status: SavingsAccountStatus.ACTIVE },
+      include: {
+        membership: {
+          include: { user: { select: { firstName: true, lastName: true } } },
+        },
+      },
+      orderBy: { balance: 'desc' },
+      take: 5,
+    });
+
+    return [
+      `Monthly trend (last 6 months): ${months.join(' | ')}`,
+      overdueInstallments.length > 0
+        ? `Overdue loan installments: ${overdueInstallments
+            .map(
+              (i) =>
+                `${i.loan.membership.user.firstName} ${i.loan.membership.user.lastName} owes ${i.principalDue.plus(i.interestDue).minus(i.amountPaid).toFixed(2)} (due ${i.dueDate.toISOString().slice(0, 10)})`,
+            )
+            .join('; ')}`
+        : 'Overdue loan installments: none',
+      `Top savers: ${
+        topSavers
+          .map(
+            (a) =>
+              `${a.membership.user.firstName} ${a.membership.user.lastName} (${a.balance.toFixed(2)})`,
+          )
+          .join('; ') || 'No active savings accounts'
+      }`,
+    ];
+  }
+
+  async generateCustomReport(
+    cooperativeId: string,
+    actor: AuthenticatedUser,
+    dto: GenerateCustomReportDto,
+  ) {
+    const cooperative = await this.prisma.cooperative.findUnique({
+      where: { id: cooperativeId },
+    });
+    if (!cooperative) {
+      throw new NotFoundException('Cooperative not found');
+    }
+
+    const contextLines = [
+      ...(await this.buildGovernanceContext(cooperativeId)),
+      ...(await this.buildTrendAndRiskContext(cooperativeId)),
+    ];
+
+    const raw = await this.aiClient.chat(
+      [
+        {
+          role: 'system',
+          content:
+            'You write custom management reports for a Nigerian cooperative society, using ONLY the data given below. Never invent figures. ' +
+            'Respond with STRICT JSON only (no markdown fences, no commentary) in this exact shape: ' +
+            '{"title": string, "sections": [{"heading": string, "body": string}]}. ' +
+            'Produce 2-5 sections directly relevant to the request. Each body should be 2-5 factual sentences. ' +
+            'If the requested topic has no supporting data in the context, say so plainly in that section rather than inventing numbers.\n\nData:\n' +
+            contextLines.join('\n'),
+        },
+        { role: 'user', content: dto.prompt },
+      ],
+      1500,
+    );
+
+    let title = dto.prompt;
+    let sections: { heading: string; body: string }[];
+    try {
+      const cleaned = raw.replace(/^```(?:json)?\s*|\s*```$/g, '');
+      const parsed = JSON.parse(cleaned) as {
+        title?: string;
+        sections?: { heading: string; body: string }[];
+      };
+      title = parsed.title ?? title;
+      sections = Array.isArray(parsed.sections) ? parsed.sections : [];
+      if (sections.length === 0) {
+        sections = [{ heading: 'Report', body: raw }];
+      }
+    } catch {
+      sections = [{ heading: 'Report', body: raw }];
+    }
+
+    const generatedAt = new Date();
+    const pdf = await this.pdf.generateCustomReportPdf({
+      cooperativeName: cooperative.name,
+      prompt: dto.prompt,
+      title,
+      sections,
+      generatedAt,
+    });
+
+    const fileSlug = generatedAt.toISOString().replace(/[:.]/g, '-');
+    const document = await this.prisma.document.create({
+      data: {
+        cooperativeId,
+        uploadedByUserId: actor.userId,
+        title,
+        category: DocumentCategory.REPORT,
+        fileName: `custom-report-${fileSlug}.pdf`,
+        mimeType: 'application/pdf',
+        sizeBytes: pdf.length,
+        content: pdf,
+      },
+      select: {
+        id: true,
+        cooperativeId: true,
+        uploadedByUserId: true,
+        title: true,
+        category: true,
+        fileName: true,
+        mimeType: true,
+        sizeBytes: true,
+        createdAt: true,
+      },
+    });
+
+    await this.auditLog.record({
+      cooperativeId,
+      actorUserId: actor.userId,
+      action: 'report.custom_generated',
+      targetType: 'Document',
+      targetId: document.id,
+      metadata: { prompt: dto.prompt },
+    });
+
+    return { document, title, sections };
   }
 
   async askAssistant(

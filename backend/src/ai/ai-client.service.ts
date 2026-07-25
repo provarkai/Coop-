@@ -19,7 +19,7 @@ export class AiClientService {
 
   constructor(private readonly config: ConfigService) {}
 
-  async chat(messages: ChatMessage[]): Promise<string> {
+  async chat(messages: ChatMessage[], maxTokens = 500): Promise<string> {
     const apiKey = this.config.get<string>('OPENROUTER_API_KEY');
     if (!apiKey) {
       throw new InternalServerErrorException(
@@ -38,7 +38,7 @@ export class AiClientService {
         model,
         messages,
         temperature: 0.3,
-        max_tokens: 500,
+        max_tokens: maxTokens,
       }),
     });
 

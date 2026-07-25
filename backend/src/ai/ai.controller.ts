@@ -6,10 +6,12 @@ import { CooperativeRolesGuard } from '../cooperatives/guards/cooperative-roles.
 import {
   AUDIT_ROLES,
   MANAGE_GOVERNANCE_ROLES,
+  VIEW_DASHBOARD_ROLES,
   VIEW_LOAN_ROLES,
 } from '../cooperatives/roles.constants';
 import { AiService } from './ai.service';
 import { AskAssistantDto } from './dto/ask-assistant.dto';
+import { GenerateCustomReportDto } from './dto/generate-custom-report.dto';
 
 @UseGuards(CooperativeRolesGuard)
 @Controller('cooperatives')
@@ -45,5 +47,15 @@ export class AiController {
   @Get(':id/fraud-alerts')
   detectFraudSignals(@Param('id') id: string) {
     return this.ai.detectFraudSignals(id);
+  }
+
+  @CooperativeRoles(...VIEW_DASHBOARD_ROLES)
+  @Post(':id/ai/custom-report')
+  generateCustomReport(
+    @Param('id') id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: GenerateCustomReportDto,
+  ) {
+    return this.ai.generateCustomReport(id, actor, dto);
   }
 }

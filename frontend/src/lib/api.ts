@@ -69,6 +69,12 @@ export interface CooperativeMembership {
   user: { id: string; email: string; firstName: string; lastName: string };
 }
 
+export interface CustomReportResult {
+  document: DocumentMetadata;
+  title: string;
+  sections: { heading: string; body: string }[];
+}
+
 export interface BulkImportResult {
   imported: number;
   skipped: number;
@@ -1455,6 +1461,13 @@ export const api = {
 
   getFraudAlerts: (cooperativeId: string) =>
     request<FraudAlert[]>(`/cooperatives/${cooperativeId}/fraud-alerts`, { method: "GET" }, true),
+
+  generateCustomReport: (cooperativeId: string, prompt: string) =>
+    request<CustomReportResult>(
+      `/cooperatives/${cooperativeId}/ai/custom-report`,
+      { method: "POST", body: JSON.stringify({ prompt }) },
+      true,
+    ),
 
   // Module: Contribution Engine (Ajo/Esusu)
   createContributionGroup: (

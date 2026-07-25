@@ -49,6 +49,14 @@ interface DashboardReportPdfInput {
   narrative?: string;
 }
 
+interface CustomReportPdfInput {
+  cooperativeName: string;
+  prompt: string;
+  title: string;
+  sections: { heading: string; body: string }[];
+  generatedAt: Date;
+}
+
 @Injectable()
 export class PdfService {
   generateMembershipCardPdf(data: MembershipCardPdfInput): Promise<Buffer> {
@@ -162,6 +170,31 @@ export class PdfService {
       doc.fontSize(14).text('Governance');
       doc.fontSize(11).text(`Upcoming meetings: ${s.upcomingMeetings}`);
       doc.text(`Open resolutions: ${s.openResolutions}`);
+    });
+  }
+
+  generateCustomReportPdf(data: CustomReportPdfInput): Promise<Buffer> {
+    return this.render((doc) => {
+      doc.fontSize(18).text(data.title, { align: 'center' });
+      doc.fontSize(10).text(data.cooperativeName, { align: 'center' });
+      doc
+        .fontSize(9)
+        .fillColor('#666')
+        .text(`Generated ${data.generatedAt.toISOString()}`, {
+          align: 'center',
+        });
+      doc.fillColor('#000');
+      doc.moveDown();
+      doc.fontSize(10).fillColor('#666').text(`Requested: "${data.prompt}"`);
+      doc.fillColor('#000');
+      doc.moveDown();
+
+      for (const section of data.sections) {
+        doc.fontSize(14).text(section.heading);
+        doc.moveDown(0.3);
+        doc.fontSize(11).text(section.body);
+        doc.moveDown();
+      }
     });
   }
 
