@@ -20,6 +20,7 @@ import { RegulatorAssignmentsService } from '../regulator-assignments/regulator-
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { CreateCooperativeDto } from './dto/create-cooperative.dto';
 import { UpdateCooperativeDto } from './dto/update-cooperative.dto';
+import { UpdateCooperativeLogoDto } from './dto/update-cooperative-logo.dto';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import { CreateCommitteeDto } from './dto/create-committee.dto';
@@ -37,6 +38,27 @@ import {
   MANAGE_GOVERNANCE_ROLES,
 } from './roles.constants';
 import { PdfService } from '../pdf/pdf.service';
+
+// Excludes the (potentially large) logo bytes from every general cooperative
+// read -- the dedicated logo endpoint is the only place that fetches them.
+const COOPERATIVE_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  state: true,
+  registrationNumber: true,
+  email: true,
+  phone: true,
+  address: true,
+  bylaws: true,
+  logoMimeType: true,
+  financialYearStartMonth: true,
+  financialYearStartDay: true,
+  currency: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+};
 
 @Injectable()
 export class CooperativesService {
@@ -102,6 +124,7 @@ export class CooperativesService {
     return this.prisma.$transaction(async (tx) => {
       const cooperative = await tx.cooperative.create({
         data: cooperativeData,
+        select: COOPERATIVE_SELECT,
       });
       await tx.cooperativeMembership.create({
         data: {
@@ -127,6 +150,7 @@ export class CooperativesService {
   async findAllForUser(user: AuthenticatedUser) {
     if (user.role === Role.SUPER_ADMIN) {
       return this.prisma.cooperative.findMany({
+        select: COOPERATIVE_SELECT,
         orderBy: { createdAt: 'desc' },
       });
     }
@@ -136,6 +160,7 @@ export class CooperativesService {
           some: { userId: user.userId, status: MembershipStatus.ACTIVE },
         },
       },
+      select: COOPERATIVE_SELECT,
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -159,7 +184,31 @@ export class CooperativesService {
     return this.prisma.cooperative.update({
       where: { id: cooperativeId },
       data: dto,
+      select: COOPERATIVE_SELECT,
     });
+  }
+
+  async updateLogo(cooperativeId: string, dto: UpdateCooperativeLogoDto) {
+    await this.getCooperativeOrThrow(cooperativeId);
+    await this.prisma.cooperative.update({
+      where: { id: cooperativeId },
+      data: {
+        logo: Buffer.from(dto.contentBase64, 'base64'),
+        logoMimeType: dto.mimeType,
+      },
+      select: { id: true },
+    });
+  }
+
+  async getLogo(cooperativeId: string) {
+    const cooperative = await this.prisma.cooperative.findUnique({
+      where: { id: cooperativeId },
+      select: { logo: true, logoMimeType: true },
+    });
+    if (!cooperative || !cooperative.logo || !cooperative.logoMimeType) {
+      throw new NotFoundException('No logo uploaded for this cooperative');
+    }
+    return { content: cooperative.logo, mimeType: cooperative.logoMimeType };
   }
 
   async createBranch(cooperativeId: string, dto: CreateBranchDto) {
@@ -899,6 +948,7 @@ export class CooperativesService {
   private async getCooperativeOrThrow(cooperativeId: string) {
     const cooperative = await this.prisma.cooperative.findUnique({
       where: { id: cooperativeId },
+      select: COOPERATIVE_SELECT,
     });
     if (!cooperative) {
       throw new NotFoundException('Cooperative not found');

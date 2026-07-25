@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, storeTokens, ApiError } from "@/lib/api";
+import { api, storeTokens, postLoginDestination, ApiError } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,7 +21,7 @@ export default function LoginPage() {
     try {
       const result = await api.login({ email, password, mfaCode: mfaRequired ? mfaCode : undefined });
       storeTokens(result);
-      router.push("/dashboard");
+      router.push(await postLoginDestination());
     } catch (err) {
       if (err instanceof ApiError && err.message.toLowerCase().includes("mfa")) {
         setMfaRequired(true);

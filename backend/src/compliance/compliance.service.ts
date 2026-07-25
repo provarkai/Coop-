@@ -39,7 +39,23 @@ export class ComplianceService {
     const scopedIds = await this.scopedCooperativeIds(user);
     return this.prisma.cooperative.findMany({
       where: scopedIds ? { id: { in: scopedIds } } : undefined,
-      include: {
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        state: true,
+        registrationNumber: true,
+        email: true,
+        phone: true,
+        address: true,
+        bylaws: true,
+        logoMimeType: true,
+        financialYearStartMonth: true,
+        financialYearStartDay: true,
+        currency: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
         _count: { select: { memberships: true, complianceFilings: true } },
       },
       orderBy: { name: 'asc' },

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Cooperative profile, logo, and post-login redirect** — `Cooperative` gets
+  a logo (`PATCH/GET /cooperatives/:id/logo`, base64 upload like documents,
+  excluded from every general cooperative read so listings stay light) and a
+  full editable profile (name, state, registration number, email, phone,
+  address, by-laws) in the Settings tab. Login now skips the generic account
+  hub when a member/admin belongs to exactly one cooperative, landing
+  straight on its Dashboard tab instead.
 - **Cooperative page: dashboard-first navigation** — The sidebar now switches
   between sections (only the active one renders) instead of jumping to an
   anchor on one long scrolling page. The Dashboard/report is the default

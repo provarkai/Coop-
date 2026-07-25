@@ -149,6 +149,8 @@ model Cooperative {
   phone                   String?
   address                 String?
   bylaws                  String?
+  logo                    Bytes?
+  logoMimeType            String?
   financialYearStartMonth Int      @default(1)
   financialYearStartDay   Int      @default(1)
   currency                String   @default("NGN")

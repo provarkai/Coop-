@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, use, type FormEvent } from "react";
+import { useEffect, useState, use, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   api,
   ApiError,
+  downloadFile,
   getAccessToken,
   type AuditLogEntry,
   type AuthUser,
@@ -61,10 +62,19 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingError, setPendingError] = useState<string | null>(null);
 
+  const [profileName, setProfileName] = useState("");
+  const [profileState, setProfileState] = useState("");
+  const [profileRegistrationNumber, setProfileRegistrationNumber] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [profileAddress, setProfileAddress] = useState("");
   const [bylaws, setBylaws] = useState("");
   const [financialYearStartMonth, setFinancialYearStartMonth] = useState(1);
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
 
   const [branchName, setBranchName] = useState("");
   const [branchError, setBranchError] = useState<string | null>(null);
@@ -108,8 +118,21 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
       api.listMembers(id),
     ]);
     setCooperative(coop);
+    setProfileName(coop.name);
+    setProfileState(coop.state ?? "");
+    setProfileRegistrationNumber(coop.registrationNumber ?? "");
+    setProfileEmail(coop.email ?? "");
+    setProfilePhone(coop.phone ?? "");
+    setProfileAddress(coop.address ?? "");
     setBylaws(coop.bylaws ?? "");
     setFinancialYearStartMonth(coop.financialYearStartMonth);
+    if (coop.logoMimeType) {
+      downloadFile(`/cooperatives/${id}/logo`)
+        .then((blob) => setLogoUrl(URL.createObjectURL(blob)))
+        .catch(() => setLogoUrl(null));
+    } else {
+      setLogoUrl(null);
+    }
     setBranches(branchList);
     setCommittees(committeeList);
     setMembers(memberList);
@@ -181,11 +204,41 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
     setSettingsError(null);
     setSettingsMessage(null);
     try {
-      const updated = await api.updateCooperative(id, { bylaws, financialYearStartMonth });
+      const updated = await api.updateCooperative(id, {
+        name: profileName,
+        state: profileState || undefined,
+        registrationNumber: profileRegistrationNumber || undefined,
+        email: profileEmail || undefined,
+        phone: profilePhone || undefined,
+        address: profileAddress || undefined,
+        bylaws,
+        financialYearStartMonth,
+      });
       setCooperative(updated);
       setSettingsMessage("Saved");
     } catch (err) {
       setSettingsError(err instanceof ApiError ? err.message : "Something went wrong");
+    }
+  }
+
+  async function onUploadLogo(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoError(null);
+    try {
+      const contentBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      await api.updateCooperativeLogo(id, { mimeType: file.type, contentBase64 });
+      const blob = await downloadFile(`/cooperatives/${id}/logo`);
+      setLogoUrl(URL.createObjectURL(blob));
+    } catch (err) {
+      setLogoError(err instanceof ApiError ? err.message : "Something went wrong");
+    } finally {
+      e.target.value = "";
     }
   }
 
@@ -544,8 +597,17 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
         <Link href="/cooperatives" className="text-sm font-medium text-black dark:text-zinc-50">
           ← All cooperatives
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-black dark:text-zinc-50">{cooperative.name}</h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-500">/{cooperative.slug}</p>
+        <div className="mt-2 flex items-center gap-3">
+          {logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element -- authenticated blob URL, not a static asset
+            <img src={logoUrl} alt={`${cooperative.name} logo`} className="h-10 w-10 rounded-md object-cover" />
+          )}
+          <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">{cooperative.name}</h1>
+        </div>
+        <p className="text-sm text-zinc-500 dark:text-zinc-500">
+          /{cooperative.slug}
+          {cooperative.state && ` · ${cooperative.state}`}
+        </p>
         {inviteLink && (
           <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
             Invite link: <span className="break-all">{inviteLink}</span>
@@ -563,6 +625,71 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
         <form onSubmit={onSaveSettings} className="space-y-3">
           <ErrorText message={settingsError} />
           {settingsMessage && <p className="text-sm text-zinc-600 dark:text-zinc-400">{settingsMessage}</p>}
+
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">
+            Logo
+            <div className="mt-1 flex items-center gap-3">
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- authenticated blob URL, not a static asset
+                <img src={logoUrl} alt="Cooperative logo" className="h-12 w-12 rounded-md object-cover" />
+              ) : (
+                <div className="h-12 w-12 rounded-md border border-dashed border-black/[.15] dark:border-white/[.2]" />
+              )}
+              <input type="file" accept="image/*" onChange={onUploadLogo} className="text-sm" />
+            </div>
+          </label>
+          <ErrorText message={logoError} />
+
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">
+            Name
+            <input
+              className="mt-1 w-full rounded-md border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
+              value={profileName}
+              onChange={(e) => setProfileName(e.target.value)}
+              required
+            />
+          </label>
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">
+            State
+            <input
+              className="mt-1 w-full rounded-md border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
+              value={profileState}
+              onChange={(e) => setProfileState(e.target.value)}
+            />
+          </label>
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">
+            Registration number
+            <input
+              className="mt-1 w-full rounded-md border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
+              value={profileRegistrationNumber}
+              onChange={(e) => setProfileRegistrationNumber(e.target.value)}
+            />
+          </label>
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">
+            Email
+            <input
+              type="email"
+              className="mt-1 w-full rounded-md border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
+              value={profileEmail}
+              onChange={(e) => setProfileEmail(e.target.value)}
+            />
+          </label>
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">
+            Phone
+            <input
+              className="mt-1 w-full rounded-md border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
+              value={profilePhone}
+              onChange={(e) => setProfilePhone(e.target.value)}
+            />
+          </label>
+          <label className="block text-sm text-zinc-600 dark:text-zinc-400">
+            Address
+            <input
+              className="mt-1 w-full rounded-md border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
+              value={profileAddress}
+              onChange={(e) => setProfileAddress(e.target.value)}
+            />
+          </label>
           <label className="block text-sm text-zinc-600 dark:text-zinc-400">
             By-laws
             <textarea

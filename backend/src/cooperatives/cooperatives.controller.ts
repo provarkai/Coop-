@@ -19,6 +19,7 @@ import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { CooperativesService } from './cooperatives.service';
 import { CreateCooperativeDto } from './dto/create-cooperative.dto';
 import { UpdateCooperativeDto } from './dto/update-cooperative.dto';
+import { UpdateCooperativeLogoDto } from './dto/update-cooperative-logo.dto';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import { CreateCommitteeDto } from './dto/create-committee.dto';
@@ -74,6 +75,21 @@ export class CooperativesController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateCooperativeDto) {
     return this.cooperatives.update(id, dto);
+  }
+
+  // No CooperativeRoles restriction: a logo is shown pre-membership too (e.g.
+  // the join page), same as the preview endpoint above.
+  @Get(':id/logo')
+  async getLogo(@Param('id') id: string, @Res() res: Response) {
+    const logo = await this.cooperatives.getLogo(id);
+    res.setHeader('Content-Type', logo.mimeType);
+    res.send(logo.content);
+  }
+
+  @CooperativeRoles(...MANAGE_COOPERATIVE)
+  @Patch(':id/logo')
+  updateLogo(@Param('id') id: string, @Body() dto: UpdateCooperativeLogoDto) {
+    return this.cooperatives.updateLogo(id, dto);
   }
 
   @CooperativeRoles(...MANAGE_COOPERATIVE)

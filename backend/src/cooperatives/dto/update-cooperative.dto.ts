@@ -17,6 +17,10 @@ export class UpdateCooperativeDto {
 
   @IsOptional()
   @IsString()
+  state?: string;
+
+  @IsOptional()
+  @IsString()
   registrationNumber?: string;
 
   @IsOptional()

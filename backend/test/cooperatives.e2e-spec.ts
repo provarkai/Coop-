@@ -154,6 +154,33 @@ describe('Cooperatives (e2e)', () => {
 
     expect(res.body.bylaws).toBe('Members must attend the AGM');
     expect(res.body.financialYearStartMonth).toBe(4);
+    expect(res.body.logo).toBeUndefined();
+  });
+
+  it('lets the admin upload a logo, which any member can then fetch', async () => {
+    const contentBase64 = Buffer.from('fake-png-bytes').toString('base64');
+    await request(app.getHttpServer())
+      .patch(`/cooperatives/${cooperativeId}/logo`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ mimeType: 'image/png', contentBase64 })
+      .expect(200);
+
+    const res = await request(app.getHttpServer())
+      .get(`/cooperatives/${cooperativeId}/logo`)
+      .set('Authorization', `Bearer ${memberToken}`)
+      .expect(200);
+
+    expect(res.headers['content-type']).toBe('image/png');
+    expect(Buffer.from(res.body).toString()).toBe('fake-png-bytes');
+  });
+
+  it('rejects a non-governance member from uploading a logo', async () => {
+    const contentBase64 = Buffer.from('rogue-bytes').toString('base64');
+    await request(app.getHttpServer())
+      .patch(`/cooperatives/${cooperativeId}/logo`)
+      .set('Authorization', `Bearer ${memberToken}`)
+      .send({ mimeType: 'image/png', contentBase64 })
+      .expect(403);
   });
 
   it('creates a branch as admin and rejects a duplicate name', async () => {

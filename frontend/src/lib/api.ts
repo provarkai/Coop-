@@ -26,6 +26,7 @@ export interface Cooperative {
   phone: string | null;
   address: string | null;
   bylaws: string | null;
+  logoMimeType: string | null;
   financialYearStartMonth: number;
   financialYearStartDay: number;
   currency: string;
@@ -621,10 +622,21 @@ export const api = {
     data: Partial<
       Pick<
         Cooperative,
-        "name" | "registrationNumber" | "email" | "phone" | "address" | "bylaws" | "financialYearStartMonth" | "currency"
+        | "name"
+        | "state"
+        | "registrationNumber"
+        | "email"
+        | "phone"
+        | "address"
+        | "bylaws"
+        | "financialYearStartMonth"
+        | "currency"
       >
     >,
   ) => request<Cooperative>(`/cooperatives/${id}`, { method: "PATCH", body: JSON.stringify(data) }, true),
+
+  updateCooperativeLogo: (id: string, data: { mimeType: string; contentBase64: string }) =>
+    request<void>(`/cooperatives/${id}/logo`, { method: "PATCH", body: JSON.stringify(data) }, true),
 
   listBranches: (cooperativeId: string) =>
     request<Branch[]>(`/cooperatives/${cooperativeId}/branches`, { method: "GET" }, true),
@@ -1223,6 +1235,26 @@ export const api = {
   getFraudAlerts: (cooperativeId: string) =>
     request<FraudAlert[]>(`/cooperatives/${cooperativeId}/fraud-alerts`, { method: "GET" }, true),
 };
+
+// Skip the generic account hub whenever we can jump straight to somewhere
+// useful: a member/admin with exactly one cooperative goes straight to its
+// dashboard; SUPER_ADMIN/REGULATOR (who have platform-wide destinations of
+// their own) and anyone with zero or multiple cooperatives land on the hub.
+export async function postLoginDestination(): Promise<string> {
+  try {
+    const me = await api.me();
+    if (me.role === "SUPER_ADMIN" || me.role === "REGULATOR") {
+      return "/dashboard";
+    }
+    const cooperatives = await api.listCooperatives();
+    if (cooperatives.length === 1) {
+      return `/cooperatives/${cooperatives[0].id}`;
+    }
+  } catch {
+    // fall through to the hub page if anything here fails
+  }
+  return "/dashboard";
+}
 
 /** Fetches a binary file (PDF, document download) with the auth header attached, for triggering a browser save-as. */
 export async function downloadFile(path: string): Promise<Blob> {

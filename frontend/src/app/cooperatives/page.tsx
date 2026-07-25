@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, ApiError, getAccessToken, type AuthUser, type Cooperative } from "@/lib/api";
+import CooperativeLogo from "./CooperativeLogo";
 
 export default function CooperativesPage() {
   const router = useRouter();
@@ -49,14 +50,17 @@ export default function CooperativesPage() {
         {cooperatives && cooperatives.length > 0 && (
           <ul className="divide-y divide-black/[.08] dark:divide-white/[.145]">
             {cooperatives.map((coop) => (
-              <li key={coop.id} className="py-3">
-                <Link
-                  href={`/cooperatives/${coop.id}`}
-                  className="font-medium text-black hover:underline dark:text-zinc-50"
-                >
-                  {coop.name}
-                </Link>
-                <p className="text-sm text-zinc-500 dark:text-zinc-500">/{coop.slug}</p>
+              <li key={coop.id} className="flex items-center gap-3 py-3">
+                <CooperativeLogo cooperativeId={coop.id} hasLogo={!!coop.logoMimeType} name={coop.name} />
+                <div>
+                  <Link
+                    href={`/cooperatives/${coop.id}`}
+                    className="font-medium text-black hover:underline dark:text-zinc-50"
+                  >
+                    {coop.name}
+                  </Link>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-500">/{coop.slug}</p>
+                </div>
               </li>
             ))}
           </ul>

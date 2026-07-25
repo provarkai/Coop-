@@ -33,6 +33,10 @@ Societies Act, registering a new cooperative is done by the platform team
 3. **Join** an existing cooperative via an invite link shared by its admin
    (`/cooperatives/:id/join`).
 
+Once you belong to exactly one cooperative, logging in takes you straight to
+its Dashboard tab instead of a generic account page. If you belong to more
+than one (or none yet), you land on `/dashboard` as before.
+
 ## As a plain member
 
 - **Dashboard** (sidebar → Dashboard): KPI tiles and trends are governance-only;
@@ -63,6 +67,10 @@ Societies Act, registering a new cooperative is done by the platform team
 Exact permissions vary by role (see the README's per-feature API tables for
 the precise role breakdown), but broadly:
 
+- **Settings** (sidebar → Settings): edit the cooperative's profile (name,
+  state, registration number, email, phone, address, by-laws) and upload a
+  logo — shown next to the name at the top of the page and on the "My
+  cooperatives" list.
 - **Members**: approve/reject applications, add members directly by email,
   change roles/status, remove members.
 - **Savings/Loans**: create products, open accounts, record
