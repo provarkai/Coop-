@@ -168,7 +168,7 @@ export default function PaymentsSection({ cooperativeId, me }: { cooperativeId: 
         )}
         <form onSubmit={onInitiate} className="flex flex-wrap gap-2">
           <select
-            className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+            className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm dark:border-white/[.145]"
             value={purpose}
             onChange={(e) => {
               setPurpose(e.target.value as "SAVINGS_DEPOSIT" | "LOAN_REPAYMENT");
@@ -179,7 +179,7 @@ export default function PaymentsSection({ cooperativeId, me }: { cooperativeId: 
             <option value="LOAN_REPAYMENT">Loan repayment</option>
           </select>
           <select
-            className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+            className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm dark:border-white/[.145]"
             value={targetId}
             onChange={(e) => setTargetId(e.target.value)}
           >
@@ -231,7 +231,7 @@ export default function PaymentsSection({ cooperativeId, me }: { cooperativeId: 
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-black dark:text-zinc-50">Payment reconciliation</h2>
             <select
-              className="rounded-md border border-black/[.08] bg-transparent px-2 py-1 text-xs dark:border-white/[.145]"
+              className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1 text-xs dark:border-white/[.145]"
               value={statusFilter}
               onChange={async (e) => {
                 setStatusFilter(e.target.value);

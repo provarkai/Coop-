@@ -195,7 +195,7 @@ export default function CommunicationSection({ cooperativeId }: { cooperativeId:
             required
           />
           <select
-            className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+            className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm dark:border-white/[.145]"
             value={docCategory}
             onChange={(e) => setDocCategory(e.target.value as DocumentCategory)}
           >
@@ -246,7 +246,7 @@ export default function CommunicationSection({ cooperativeId }: { cooperativeId:
         </ul>
         <form onSubmit={onSendAnnouncement} className="flex flex-wrap gap-2">
           <select
-            className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+            className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm dark:border-white/[.145]"
             value={announceChannel}
             onChange={(e) => setAnnounceChannel(e.target.value as NotificationChannel)}
           >

@@ -545,7 +545,7 @@ export default function LoansSection({ cooperativeId, me }: { cooperativeId: str
         </ul>
         <form onSubmit={onApply} className="flex flex-wrap gap-2">
           <select
-            className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+            className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm dark:border-white/[.145]"
             value={applyProductId}
             onChange={(e) => setApplyProductId(e.target.value)}
             required

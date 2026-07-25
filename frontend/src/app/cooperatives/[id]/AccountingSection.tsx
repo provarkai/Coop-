@@ -172,7 +172,7 @@ export default function AccountingSection({ cooperativeId }: { cooperativeId: st
             required
           />
           <select
-            className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+            className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm dark:border-white/[.145]"
             value={accountType}
             onChange={(e) => setAccountType(e.target.value as AccountType)}
           >
@@ -239,7 +239,7 @@ export default function AccountingSection({ cooperativeId }: { cooperativeId: st
         </ul>
         <form onSubmit={onPostEntry} className="flex flex-wrap items-center gap-2">
           <select
-            className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+            className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm dark:border-white/[.145]"
             value={debitAccountId}
             onChange={(e) => setDebitAccountId(e.target.value)}
           >
@@ -251,7 +251,7 @@ export default function AccountingSection({ cooperativeId }: { cooperativeId: st
             ))}
           </select>
           <select
-            className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+            className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm dark:border-white/[.145]"
             value={creditAccountId}
             onChange={(e) => setCreditAccountId(e.target.value)}
           >
@@ -337,7 +337,7 @@ export default function AccountingSection({ cooperativeId }: { cooperativeId: st
         </ul>
         <form onSubmit={onSetBudget} className="flex flex-wrap gap-2">
           <select
-            className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+            className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm dark:border-white/[.145]"
             value={budgetAccountId}
             onChange={(e) => setBudgetAccountId(e.target.value)}
           >

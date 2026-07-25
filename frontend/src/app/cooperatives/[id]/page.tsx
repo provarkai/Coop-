@@ -534,7 +534,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
-            className="rounded-md border border-black/[.08] bg-transparent px-2 py-1 text-xs dark:border-white/[.145]"
+            className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1 text-xs dark:border-white/[.145]"
             value={draft.type}
             onChange={(e) =>
               setTransactionDrafts((prev) => ({
@@ -740,7 +740,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
           <label className="block text-sm text-zinc-600 dark:text-zinc-400">
             Financial year start month
             <select
-              className="mt-1 w-full rounded-md border border-black/[.08] bg-transparent px-3 py-2 text-sm dark:border-white/[.145]"
+              className="mt-1 w-full rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-3 py-2 text-sm dark:border-white/[.145]"
               value={financialYearStartMonth}
               onChange={(e) => setFinancialYearStartMonth(Number(e.target.value))}
             >
@@ -775,7 +775,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
         )}
         <form onSubmit={onConnectBankAccount} className="flex flex-wrap gap-2">
           <select
-            className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+            className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm dark:border-white/[.145]"
             value={bankCode}
             onChange={(e) => setBankCode(e.target.value)}
             required
@@ -947,7 +947,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
                 </Link>
                 <div className="flex items-center gap-2">
                   <select
-                    className="rounded-md border border-black/[.08] bg-transparent px-2 py-1 text-xs dark:border-white/[.145]"
+                    className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1 text-xs dark:border-white/[.145]"
                     value={m.role}
                     onChange={(e) => onUpdateMemberRole(m.userId, e.target.value)}
                   >
@@ -960,7 +960,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
                   {savingsProducts.length > 0 && (
                     <>
                       <select
-                        className="rounded-md border border-black/[.08] bg-transparent px-2 py-1 text-xs dark:border-white/[.145]"
+                        className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1 text-xs dark:border-white/[.145]"
                         value={openAccountProduct[m.userId] ?? ""}
                         onChange={(e) =>
                           setOpenAccountProduct((prev) => ({ ...prev, [m.userId]: e.target.value }))
@@ -1002,7 +1002,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
             required
           />
           <select
-            className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+            className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm dark:border-white/[.145]"
             value={memberRole}
             onChange={(e) => setMemberRole(e.target.value)}
           >
@@ -1151,7 +1151,7 @@ export default function CooperativeDetailPage({ params }: { params: Promise<{ id
         <form onSubmit={onSubmitFiling} className="space-y-2">
           <div className="flex gap-2">
             <select
-              className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+              className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm dark:border-white/[.145]"
               value={filingType}
               onChange={(e) => setFilingType(e.target.value)}
             >

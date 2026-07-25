@@ -295,7 +295,7 @@ export default function MeetingsSection({ cooperativeId, me }: { cooperativeId: 
               required
             />
             <select
-              className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+              className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm dark:border-white/[.145]"
               value={type}
               onChange={(e) => setType(e.target.value as MeetingType)}
             >
@@ -505,7 +505,7 @@ export default function MeetingsSection({ cooperativeId, me }: { cooperativeId: 
                 required
               />
               <select
-                className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+                className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm dark:border-white/[.145]"
                 value={resolutionAgendaItemId}
                 onChange={(e) => setResolutionAgendaItemId(e.target.value)}
               >

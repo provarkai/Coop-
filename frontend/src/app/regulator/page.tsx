@@ -328,7 +328,7 @@ export default function RegulatorPage() {
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-black dark:text-zinc-50">Compliance filings</h2>
           <select
-            className="rounded-md border border-black/[.08] bg-transparent px-2 py-1 text-xs dark:border-white/[.145]"
+            className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1 text-xs dark:border-white/[.145]"
             value={statusFilter}
             onChange={(e) => onFilterChange(e.target.value)}
           >

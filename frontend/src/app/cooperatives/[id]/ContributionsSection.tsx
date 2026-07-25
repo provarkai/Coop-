@@ -280,7 +280,7 @@ export default function ContributionsSection({ cooperativeId }: { cooperativeId:
               required
             />
             <select
-              className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+              className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm dark:border-white/[.145]"
               value={type}
               onChange={(e) => setType(e.target.value as ContributionGroupType)}
             >
@@ -288,7 +288,7 @@ export default function ContributionsSection({ cooperativeId }: { cooperativeId:
               <option value="ROTATING">Rotating (Ajo)</option>
             </select>
             <select
-              className="rounded-md border border-black/[.08] bg-transparent px-2 py-1.5 text-sm dark:border-white/[.145]"
+              className="rounded-md border border-black/[.08] bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm dark:border-white/[.145]"
               value={frequency}
               onChange={(e) => setFrequency(e.target.value as ContributionFrequency)}
             >
