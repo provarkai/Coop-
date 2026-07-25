@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, ApiError, getAccessToken, type PlatformUser } from "@/lib/api";
 
-const PLATFORM_ROLES = ["MEMBER", "REGULATOR", "SUPER_ADMIN"];
+const PLATFORM_ROLES = ["MEMBER", "REGULATOR", "UNION_ADMIN", "SUPER_ADMIN"];
 
 export default function AdminUsersPage() {
   const router = useRouter();

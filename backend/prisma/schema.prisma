@@ -53,6 +53,7 @@ datasource db {
 enum Role {
   SUPER_ADMIN
   REGULATOR
+  UNION_ADMIN
   COOPERATIVE_ADMIN
   CHAIRMAN
   SECRETARY
@@ -109,6 +110,8 @@ model User {
   notificationsSent           Notification[]          @relation("NotificationSender")
   regulatorAssignments        RegulatorAssignment[]   @relation("RegulatorAssignmentRegulator")
   regulatorAssignmentsMade    RegulatorAssignment[]   @relation("RegulatorAssignmentAssignedBy")
+  unionAssignments            UnionAssignment[]       @relation("UnionAssignmentAdmin")
+  unionAssignmentsMade        UnionAssignment[]       @relation("UnionAssignmentAssignedBy")
   contributionsConfirmed      Contribution[]          @relation("ContributionConfirmer")
   landParcelsListed           LandParcel[]            @relation("LandParcelLister")
   milestonesVerified          SyndicationMilestone[]  @relation("MilestoneVerifier")
@@ -151,6 +154,8 @@ model Cooperative {
   name                    String
   slug                    String   @unique
   state                   String?
+  unionId                 String?
+  union                   Union?   @relation(fields: [unionId], references: [id], onDelete: SetNull)
   registrationNumber      String?
   email                   String?
   phone                   String?
@@ -196,6 +201,34 @@ model Cooperative {
   syndications         Syndication[]
 
   @@index([state])
+  @@index([unionId])
+}
+
+model Union {
+  id                 String   @id @default(cuid())
+  name               String
+  slug               String   @unique
+  registrationNumber String?
+  description        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  cooperatives Cooperative[]
+  assignments  UnionAssignment[]
+}
+
+model UnionAssignment {
+  id               String   @id @default(cuid())
+  unionId          String
+  union            Union    @relation(fields: [unionId], references: [id], onDelete: Cascade)
+  unionAdminUserId String
+  unionAdmin       User     @relation("UnionAssignmentAdmin", fields: [unionAdminUserId], references: [id], onDelete: Cascade)
+  assignedByUserId String
+  assignedBy       User     @relation("UnionAssignmentAssignedBy", fields: [assignedByUserId], references: [id])
+  createdAt        DateTime @default(now())
+
+  @@unique([unionId, unionAdminUserId])
+  @@index([unionAdminUserId])
 }
 
 model Branch {

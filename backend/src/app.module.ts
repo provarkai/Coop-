@@ -24,6 +24,7 @@ import { AiModule } from './ai/ai.module';
 import { ContributionsModule } from './contributions/contributions.module';
 import { LandBankingModule } from './land-banking/land-banking.module';
 import { SyndicationModule } from './syndication/syndication.module';
+import { UnionsModule } from './unions/unions.module';
 import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
 
 @Module({
@@ -52,6 +53,7 @@ import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
     ContributionsModule,
     LandBankingModule,
     SyndicationModule,
+    UnionsModule,
   ],
   controllers: [AppController],
   providers: [

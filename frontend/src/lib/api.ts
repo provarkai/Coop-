@@ -204,6 +204,56 @@ export interface RegulatorAssignment {
   regulator?: { id: string; email: string; firstName: string; lastName: string };
 }
 
+export interface Union {
+  id: string;
+  name: string;
+  slug: string;
+  registrationNumber: string | null;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UnionCooperativeSummary {
+  id: string;
+  name: string;
+  slug: string;
+  state: string | null;
+  isActive: boolean;
+}
+
+export interface UnionDetail extends Union {
+  cooperatives: UnionCooperativeSummary[];
+}
+
+export interface UnionDashboard {
+  cooperativeCount: number;
+  activeMembers: number;
+  pendingApplications: number;
+  totalSavingsBalance: string;
+  totalOutstandingLoans: string;
+  loansDisbursedThisMonth: string;
+  cooperatives: {
+    id: string;
+    name: string;
+    slug: string;
+    isActive: boolean;
+    activeMembers: number;
+    totalSavingsBalance: string;
+    totalOutstandingLoans: string;
+  }[];
+  generatedAt: string;
+}
+
+export interface UnionAssignment {
+  id: string;
+  unionId: string;
+  unionAdminUserId: string;
+  assignedByUserId: string;
+  createdAt: string;
+  unionAdmin?: { id: string; email: string; firstName: string; lastName: string };
+}
+
 export interface SavingsProduct {
   id: string;
   cooperativeId: string;
@@ -1036,6 +1086,41 @@ export const api = {
 
   unassignRegulator: (assignmentId: string) =>
     request<void>(`/compliance/assignments/${assignmentId}`, { method: "DELETE" }, true),
+
+  // Federation/apex layer: unions of cooperatives
+  listUnions: () => request<Union[]>("/unions", { method: "GET" }, true),
+
+  createUnion: (data: { name: string; slug: string; registrationNumber?: string; description?: string }) =>
+    request<Union>("/unions", { method: "POST", body: JSON.stringify(data) }, true),
+
+  getUnion: (unionId: string) =>
+    request<UnionDetail>(`/unions/${unionId}`, { method: "GET" }, true),
+
+  getUnionDashboard: (unionId: string) =>
+    request<UnionDashboard>(`/unions/${unionId}/dashboard`, { method: "GET" }, true),
+
+  addCooperativeToUnion: (unionId: string, cooperativeId: string) =>
+    request<UnionCooperativeSummary>(
+      `/unions/${unionId}/cooperatives/${cooperativeId}`,
+      { method: "PATCH" },
+      true,
+    ),
+
+  removeCooperativeFromUnion: (unionId: string, cooperativeId: string) =>
+    request<void>(`/unions/${unionId}/cooperatives/${cooperativeId}`, { method: "DELETE" }, true),
+
+  listUnionAssignments: (unionId: string) =>
+    request<UnionAssignment[]>(`/unions/${unionId}/assignments`, { method: "GET" }, true),
+
+  assignUnionAdmin: (unionId: string, email: string) =>
+    request<UnionAssignment>(
+      `/unions/${unionId}/assignments`,
+      { method: "POST", body: JSON.stringify({ email }) },
+      true,
+    ),
+
+  unassignUnionAdmin: (unionId: string, assignmentId: string) =>
+    request<void>(`/unions/${unionId}/assignments/${assignmentId}`, { method: "DELETE" }, true),
 
   reviewFiling: (filingId: string, status: "APPROVED" | "REJECTED", reviewNotes?: string) =>
     request<ComplianceFiling>(
