@@ -106,13 +106,13 @@ export default function Home() {
         <nav className="flex items-center gap-3">
           <Link
             href="/login"
-            className="rounded-full border border-black/[.08] px-4 py-1.5 text-sm font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+            className="press rounded-full border border-black/[.08] px-4 py-1.5 text-sm font-medium text-black hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
           >
             Log in
           </Link>
           <Link
             href="/register"
-            className="rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
+            className="press rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background hover:bg-[#383838] dark:hover:bg-[#ccc]"
           >
             Create account
           </Link>
@@ -120,23 +120,29 @@ export default function Home() {
       </header>
 
       <section className="mx-auto flex w-full max-w-3xl flex-col items-center gap-6 px-4 py-16 text-center sm:py-24">
-        <h1 className="text-4xl font-semibold tracking-tight text-black sm:text-5xl dark:text-zinc-50">
+        <h1 className="hero-enter text-4xl font-semibold tracking-tight text-black sm:text-5xl dark:text-zinc-50">
           Coop Manager
         </h1>
-        <p className="max-w-xl text-lg text-zinc-600 dark:text-zinc-400">
+        <p
+          className="hero-enter max-w-xl text-lg text-zinc-600 dark:text-zinc-400"
+          style={{ transitionDelay: "75ms" }}
+        >
           One platform to run a Nigerian cooperative society end to end — members, savings,
           loans, real payments, governance, and regulatory compliance.
         </p>
-        <div className="flex flex-wrap justify-center gap-4">
+        <div
+          className="hero-enter flex flex-wrap justify-center gap-4"
+          style={{ transitionDelay: "150ms" }}
+        >
           <Link
             href="/register"
-            className="rounded-full bg-foreground px-6 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
+            className="press rounded-full bg-foreground px-6 py-2.5 text-sm font-medium text-background hover:bg-[#383838] dark:hover:bg-[#ccc]"
           >
             Get started
           </Link>
           <Link
             href="/login"
-            className="rounded-full border border-black/[.08] px-6 py-2.5 text-sm font-medium text-black transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
+            className="press rounded-full border border-black/[.08] px-6 py-2.5 text-sm font-medium text-black hover:bg-black/[.04] dark:border-white/[.145] dark:text-zinc-50 dark:hover:bg-[#1a1a1a]"
           >
             Log in
           </Link>
@@ -151,7 +157,7 @@ export default function Home() {
           {FEATURES.map((f) => (
             <div
               key={f.title}
-              className="space-y-2 rounded-xl border border-black/[.08] bg-white p-5 dark:border-white/[.145] dark:bg-zinc-950"
+              className="feature-card space-y-2 rounded-xl border border-black/[.08] bg-white p-5 dark:border-white/[.145] dark:bg-zinc-950"
             >
               <h3 className="font-semibold text-black dark:text-zinc-50">{f.title}</h3>
               <p className="text-sm text-zinc-600 dark:text-zinc-400">{f.description}</p>
@@ -179,7 +185,7 @@ export default function Home() {
             {REGULATOR_FEATURES.map((f) => (
               <div
                 key={f.title}
-                className="space-y-2 rounded-xl border border-black/[.08] bg-zinc-50 p-5 dark:border-white/[.145] dark:bg-black"
+                className="feature-card space-y-2 rounded-xl border border-black/[.08] bg-zinc-50 p-5 dark:border-white/[.145] dark:bg-black"
               >
                 <h3 className="font-semibold text-black dark:text-zinc-50">{f.title}</h3>
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">{f.description}</p>
@@ -189,7 +195,7 @@ export default function Home() {
           <div className="mt-8 flex justify-center">
             <Link
               href="/regulator"
-              className="rounded-full bg-foreground px-6 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
+              className="press rounded-full bg-foreground px-6 py-2.5 text-sm font-medium text-background hover:bg-[#383838] dark:hover:bg-[#ccc]"
             >
               Regulator dashboard
             </Link>
