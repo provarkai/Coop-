@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NCMS",
-  description: "Nigerian Cooperative Management System",
+  title: "Lagos Coop Management",
+  description: "Lagos Coop Management — a platform for running Nigerian cooperative societies.",
 };
 
 export default function RootLayout({
