@@ -63,6 +63,39 @@ const FEATURES: { title: string; description: string }[] = [
   },
 ];
 
+const REGULATOR_FEATURES: { title: string; description: string }[] = [
+  {
+    title: "Real-time financial standing",
+    description:
+      "See active membership, savings, outstanding loans, cash position, and net surplus for every assigned cooperative as it stands today — not just at annual filing time.",
+  },
+  {
+    title: "Compliance filing review",
+    description:
+      "Annual returns, financial statements, and AGM minutes are submitted straight into the system for you to review, approve, or reject with notes.",
+  },
+  {
+    title: "Full audit trail",
+    description:
+      "Every governance action — approvals, disbursements, role changes, filings — is logged and attributable, giving you a complete record to inspect at any time.",
+  },
+  {
+    title: "Automated fraud signals",
+    description:
+      "Unusually large transactions and rapid deposit/withdrawal round-trips are flagged automatically, surfacing risk before it becomes a complaint.",
+  },
+  {
+    title: "Funds never commingled",
+    description:
+      "Member payments settle directly into each cooperative's own bank account via its own Paystack subaccount — the platform never holds member funds.",
+  },
+  {
+    title: "State-scoped, federation-wide oversight",
+    description:
+      "You only see cooperatives assigned to you — mirroring the state Director of Cooperatives structure — with roll-up reporting across an entire union where cooperatives federate.",
+  },
+];
+
 export default function Home() {
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
@@ -127,7 +160,44 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="mx-auto w-full max-w-5xl px-4 pb-10 text-center text-xs text-zinc-500">
+      <section className="border-y border-black/[.08] bg-white py-16 dark:border-white/[.145] dark:bg-zinc-950">
+        <div className="mx-auto w-full max-w-5xl px-4">
+          <div className="mb-8 text-center">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
+              For regulators
+            </h2>
+            <p className="mt-2 text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
+              Oversight without waiting for paperwork
+            </p>
+            <p className="mx-auto mt-2 max-w-xl text-sm text-zinc-600 dark:text-zinc-400">
+              Built for the state Director of Cooperatives structure — scoped visibility into
+              every cooperative assigned to you, backed by real financial data instead of annual
+              paper returns.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {REGULATOR_FEATURES.map((f) => (
+              <div
+                key={f.title}
+                className="space-y-2 rounded-xl border border-black/[.08] bg-zinc-50 p-5 dark:border-white/[.145] dark:bg-black"
+              >
+                <h3 className="font-semibold text-black dark:text-zinc-50">{f.title}</h3>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">{f.description}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 flex justify-center">
+            <Link
+              href="/regulator"
+              className="rounded-full bg-foreground px-6 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
+            >
+              Regulator dashboard
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <footer className="mx-auto w-full max-w-5xl px-4 py-10 text-center text-xs text-zinc-500">
         Lagos Coop Management — built for Nigerian cooperative societies.
       </footer>
     </div>
