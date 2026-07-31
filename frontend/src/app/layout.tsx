@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Lagos Coop Management",
-  description: "Lagos Coop Management — a platform for running Nigerian cooperative societies.",
+  title: "Coop Manager",
+  description: "Coop Manager — a platform for running Nigerian cooperative societies.",
 };
 
 export default function RootLayout({

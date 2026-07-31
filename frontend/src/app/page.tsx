@@ -101,7 +101,7 @@ export default function Home() {
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-6">
         <span className="text-sm font-semibold tracking-tight text-black dark:text-zinc-50">
-          Lagos Coop Management
+          Coop Manager
         </span>
         <nav className="flex items-center gap-3">
           <Link
@@ -121,7 +121,7 @@ export default function Home() {
 
       <section className="mx-auto flex w-full max-w-3xl flex-col items-center gap-6 px-4 py-16 text-center sm:py-24">
         <h1 className="text-4xl font-semibold tracking-tight text-black sm:text-5xl dark:text-zinc-50">
-          Lagos Coop Management
+          Coop Manager
         </h1>
         <p className="max-w-xl text-lg text-zinc-600 dark:text-zinc-400">
           One platform to run a Nigerian cooperative society end to end — members, savings,
@@ -198,7 +198,7 @@ export default function Home() {
       </section>
 
       <footer className="mx-auto w-full max-w-5xl px-4 py-10 text-center text-xs text-zinc-500">
-        Lagos Coop Management — built for Nigerian cooperative societies.
+        Coop Manager — built for Nigerian cooperative societies.
       </footer>
     </div>
   );
